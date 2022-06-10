@@ -17,8 +17,6 @@ namespace tokens {
 bool debug = false;
 
 enum TokenKind {
-    BANGOLOO,
-
     // Keywords
     // The value is stored in the TokenStr global.
     TOKEN_KEYWORD,
@@ -89,10 +87,6 @@ namespace current {
             case TOKEN_EOF:
                 content = "EOF";
                 desc = "end of line";
-                break;
-            case BANGOLOO:
-                content = "TEXT: " + text + ", NUM: " + std::to_string(num) + ", SYMBOL: " + std::string(1, symbol);
-                desc = "BANGALOO";
                 break;
             default: 
                 content = "?";
