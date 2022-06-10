@@ -98,6 +98,8 @@ namespace current {
     }
 }
 
+bool has_current = false;
+
 bool has_next() {
     return current::kind != TOKEN_EOF;
 }
@@ -180,6 +182,7 @@ void next_solid() {
 namespace {
     // Read in a single token from the command line.
     void read_token() {
+        has_current = true;
 
         // Make sure there is a current char.
         if (!chars::has_current)
@@ -207,7 +210,6 @@ namespace {
                 chars::next();
             
             if (chars::current == '\n') {
-                current::symbol = '\n';
 
                 // DO NOT move past this newline!
                 // nextChar()
@@ -220,6 +222,7 @@ namespace {
                 // next line is input by the next user, since input is buffered
                 // between newlines.
 
+                current::symbol = '\n';
                 current::kind = TOKEN_SYMBOL;
                 return;
             }
