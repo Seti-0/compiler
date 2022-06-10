@@ -37,18 +37,18 @@ static void interactive_parsing() {
     printf(" -> extern print(text, end);\n");
     printf("\n");
 
-    while (has_next_token()) {
+    while (tokens::has_next()) {
 
         printf("ready> ");
         
         bool line_ended = false;
-        while (has_next_token() && !line_ended) {
+        while (tokens::has_next() && !line_ended) {
             
-            next_token();
-            while (has_next_token() && is_symbol(';'))
-                next_token();
+            tokens::next();
+            while (tokens::has_next() && tokens::current::is_symbol(';'))
+                tokens::next();
 
-            if (is_symbol('\n'))
+            if (tokens::current::is_symbol('\n'))
                 line_ended = true;
             
             else {
@@ -56,14 +56,14 @@ static void interactive_parsing() {
                     parse_statement();
                 } catch (std::exception& e) {
                     print_exception(e, 0);
-                    printf("(Error Token: %s)\n", describe_token().c_str());
+                    printf("(Error Token: %s)\n", tokens::current::describe().c_str());
 
                     // After an error, skip past the rest of the line.
-                    while (has_next_token() && !is_symbol('\n'))
-                        next_token();
+                    while (tokens::has_next() && !tokens::current::is_symbol('\n'))
+                        tokens::next();
                 }
 
-                if (is_symbol('\n'))
+                if (tokens::current::is_symbol('\n'))
                     line_ended = true;
             }
         
@@ -117,15 +117,15 @@ static std::unique_ptr<PrototypeAST> parse_extern();
 
 // Statement ::= FnDef | Extern | Expr
 static std::unique_ptr<StatementAST> parse_statement() {
-    if (CurrentToken == TOKEN_EOF || is_symbol(';')) 
+    if (tokens::current::kind == tokens::TOKEN_EOF || tokens::current::is_symbol(';')) 
         return nullptr;
 
     try {
         std::unique_ptr<StatementAST> result = nullptr;
 
-        if (is_keyword("def")) 
+        if (tokens::current::is_keyword("def")) 
             result = parse_def();
-        else if (is_keyword("extern"))
+        else if (tokens::current::is_keyword("extern"))
             result = parse_extern();
         else
             result = parse_top_level_expr();
@@ -157,9 +157,9 @@ static std::unique_ptr<PrototypeAST> parse_prototype();
 
 // FnDef ::= 'def' Proto Expr
 static std::unique_ptr<FunctionAST> parse_def() {
-    if (!is_keyword("def"))
+    if (!tokens::current::is_keyword("def"))
         throw std::runtime_error("Expected 'def' at the start of function definition.");
-    next_token(); // Move past def
+    tokens::next(); // Move past def
 
     try {
         auto proto = parse_prototype();
@@ -173,9 +173,9 @@ static std::unique_ptr<FunctionAST> parse_def() {
         
 // Extern ::= 'extern' Proto 
 static std::unique_ptr<PrototypeAST> parse_extern() {
-    if (!is_keyword("extern"))
+    if (!tokens::current::is_keyword("extern"))
         throw std::runtime_error("Expected keyword 'extern' at the start of external definition." );
-    next_token(); // Move past extern
+    tokens::next(); // Move past extern
 
     try {
         return parse_prototype();
@@ -186,28 +186,28 @@ static std::unique_ptr<PrototypeAST> parse_extern() {
 
 // Proto ::= identifier '(' identifier* ')'
 static std::unique_ptr<PrototypeAST> parse_prototype() {
-    if (!is_identifier())
+    if (!tokens::current::is(tokens::TOKEN_IDENTIFIER))
         throw std::runtime_error("Expected function name in prototype.");
 
-    std::string FnName = TokenStr;
-    next_token(); // Move past the identifier.
+    std::string FnName = tokens::current::text;
+    tokens::next(); // Move past the identifier.
 
-    if (!is_symbol('('))
+    if (!tokens::current::is_symbol('('))
         throw std::runtime_error("Expected '(' after prototype name.");
-    next_token(); // Move past '('
+    tokens::next(); // Move past '('
 
     std::vector<std::string> arg_names;
-    while (is_identifier()) {
-        arg_names.push_back(TokenStr);
-        next_token();
+    while (tokens::current::is(tokens::TOKEN_IDENTIFIER)) {
+        arg_names.push_back(tokens::current::text);
+        tokens::next();
     }
 
-    if (is_symbol(','))
+    if (tokens::current::is_symbol(','))
         printf("NOTE: Prototype arguments aren't comma delimited. E.g.: 'def f(a b)'\n");
 
-    if (!is_symbol(')'))
+    if (!tokens::current::is_symbol(')'))
         throw std::runtime_error("Expected ')' at the end of prototype arguments");
-    next_token(); // Move past ')'
+    tokens::next(); // Move past ')'
 
     return std::make_unique<PrototypeAST>(FnName, std::move(arg_names));
 }
@@ -232,11 +232,11 @@ static std::unique_ptr<ExprAST> parse_identifier();
 // Primary ::= Num | Group | Call
 static std::unique_ptr<ExprAST> parse_primary() {
     try {
-        if (is_identifier())
+        if (tokens::current::is(tokens::TOKEN_IDENTIFIER))
             return parse_identifier();
-        else if (is_number())
+        else if (tokens::current::is(tokens::TOKEN_NUMBER))
             return parse_number();
-        else if (is_symbol('('))
+        else if (tokens::current::is_symbol('('))
             return parse_group();
     } catch(...) {
         throw std::runtime_error("Failed to parse expression primary.");
@@ -250,13 +250,13 @@ static std::unique_ptr<ExprAST> parse_primary() {
 static std::map<char, int> operator_precedence;
 
 static int get_precedence() {
-    if (!is_symbol())
+    if (!tokens::current::is(tokens::TOKEN_SYMBOL))
         return -1;
     
-    if (operator_precedence.count(TokenChar) == 0)
+    if (operator_precedence.count(tokens::current::symbol) == 0)
         return -1;
 
-    return operator_precedence[TokenChar];
+    return operator_precedence[tokens::current::symbol];
 }
 
 static void setup_precedence() {
@@ -282,8 +282,8 @@ static std::unique_ptr<ExprAST> parse_rhs(
 
         // Okay, we know this is a binary operator.
         // (get_precedence() already checked that this is a symbol, note)
-        int binary_op = TokenChar;
-        next_token(); // Move on past the operator.
+        int binary_op = tokens::current::symbol;
+        tokens::next(); // Move on past the operator.
 
         // Parse the primary expression after the binary operator.
         auto rhs = parse_primary();
@@ -302,45 +302,45 @@ static std::unique_ptr<ExprAST> parse_rhs(
 
 // Call ::= Ref | FnCall
 static std::unique_ptr<ExprAST> parse_identifier() {
-    if (CurrentToken != TOKEN_IDENTIFIER)
-        throw std::runtime_error("Expected identifier token at the start of identifier.");
-    std::string name = TokenStr; // Use the current identifier token.
-    next_token(); // Move on from the identifier.
+    if (tokens::current::is(tokens::TOKEN_IDENTIFIER))
+        throw std::runtime_error("Tried to parse token that was not an identifier, as an identifier.");
+    std::string name = tokens::current::text; // Use the current identifier token.
+    tokens::next(); // Move on from the identifier.
 
-    if (!is_symbol('(')) // No open bracket means a basic reference.
+    if (!tokens::current::is_symbol('(')) // No open bracket means a basic reference.
         return std::make_unique<VariableExprAST>(name);
 
     // Else, a function call.
-    next_token(); // Move on from '('
+    tokens::next(); // Move on from '('
 
     std::vector<std::unique_ptr<ExprAST>> args;
-    if (!is_symbol(')')) {
+    if (!tokens::current::is_symbol(')')) {
         while (true) {
             if (auto arg = parse_expr())
                 args.push_back(std::move(arg));
             else
                 throw std::runtime_error("Expected expression after '(' or ',' in function argument list.");
 
-            if (is_symbol(')'))
+            if (tokens::current::is_symbol(')'))
                 break;
 
-            if (!is_symbol(','))
+            if (!tokens::current::is_symbol(','))
                 throw std::runtime_error("Expected ')' or ',' after expression in function argument list.");
             
-            next_token(); // Move on from ','
+            tokens::next(); // Move on from ','
         }
     }
 
-    next_token(); // Move on from ')'
+    tokens::next(); // Move on from ')'
 
     return std::make_unique<CallExprAST>(name, std::move(args));
 }
 
 // Group ::= '(' Expr ')'
 static std::unique_ptr<ExprAST> parse_group() {
-    if (!is_symbol('('))
+    if (!tokens::current::is_symbol('('))
         throw std::runtime_error("Expected '(' at the beginning of an expression group.");
-    next_token(); // Move on from '('
+    tokens::next(); // Move on from '('
 
     std::unique_ptr<ExprAST> expression;
     try {
@@ -349,20 +349,20 @@ static std::unique_ptr<ExprAST> parse_group() {
         std::throw_with_nested(std::runtime_error("Failed to parse expression group."));
     }
     
-    if (!is_symbol(')'))
+    if (!tokens::current::is_symbol(')'))
         throw std::runtime_error("Expected ')'");
 
-    next_token(); // Move on from ')'
+    tokens::next(); // Move on from ')'
 
     return expression;
 }
 
 // Num ::= number
 static std::unique_ptr<ExprAST> parse_number() {
-    if (!is_number())
+    if (!tokens::current::is(tokens::TOKEN_NUMBER))
         throw std::runtime_error("Attempted to parse token that was not a number, as a number.");
 
-    auto result = std::make_unique<NumberExprAST>(TokenNum);
-    next_token(); // Move on from the number.
+    auto result = std::make_unique<NumberExprAST>(tokens::current::num);
+    tokens::next(); // Move on from the number.
     return std::move(result);
 }

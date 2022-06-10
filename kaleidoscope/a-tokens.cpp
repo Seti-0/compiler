@@ -6,15 +6,19 @@
 
 #include "test.cpp"
 
+namespace tokens {
+
 // I don't really know how to use includes/header
 // files yet, hence the simplestic approach to inclusion
 // used in this project.
 
 // If this is true, a description of each
 // token read will be displayed.
-static bool DebugTokens = false;
+bool debug = false;
 
-enum Token {
+enum TokenKind {
+    BANGOLOO,
+
     // Keywords
     // The value is stored in the TokenStr global.
     TOKEN_KEYWORD,
@@ -36,84 +40,81 @@ enum Token {
 };
 
 // Main entry point to tokenization.
-// CurrentToken is a token ID - a Token enum value, or a character.
-static Token CurrentToken;
+namespace current {
+    TokenKind kind;
 
-// If the current token has a text/numerical value, it is
-// stored here.
-static std::string TokenStr;
-static double TokenNum;
-static char TokenChar;
+    // WARNING: If the current token does not make use of these, they
+    // could contain anything! (Usually they would contain the content
+    // of the last token that made use of them)    
+    std::string text;
+    double num;
+    double symbol;
 
-static void next_token();
-static void next_token();
-
-static bool is_keyword(std::string keyword) {
-    return CurrentToken == TOKEN_KEYWORD && TokenStr == keyword;
-}
-
-static bool is_symbol() {
-    return CurrentToken == TOKEN_SYMBOL;
-}
-
-static bool is_symbol(char symbol) {
-    return CurrentToken == TOKEN_SYMBOL && TokenChar == symbol;
-}
-
-static bool is_identifier() {
-    return CurrentToken == TOKEN_IDENTIFIER;
-}
-
-static bool is_number() {
-    return CurrentToken == TOKEN_NUMBER;
-}
-
-static bool has_next_token() {
-    return CurrentToken != TOKEN_EOF;
-}
-
-static std::string describe_token() {
-    std::string content;
-    std::string kind;
-   
-    switch (CurrentToken) {
-        case TOKEN_KEYWORD:
-            content = TokenStr;
-            kind = "keyword";
-            break;
-        case TOKEN_SYMBOL:
-            if (TokenChar == '\n')
-                content = "\\n";
-            else
-                content = std::string(1, TokenChar);
-            kind = "symbol";
-            break;
-        case TOKEN_NUMBER:
-            content = std::to_string(TokenNum);
-            kind = "number";
-            break;
-        case TOKEN_IDENTIFIER:
-            content = TokenStr;
-            kind = "identifier";
-            break;
-        case TOKEN_EOF:
-            content = "EOF";
-            kind = "end of line";
-            break;
-        default: 
-            content = "?";
-            kind = "Unrecognized token enum value";
-            break;
+    bool is(TokenKind target) {
+        return kind == target;
     }
 
-    return "'" + content + "' (" + kind + ")";
+    bool is_keyword(std::string keyword) {
+        return kind == TOKEN_KEYWORD && text == keyword;
+    }
+
+    bool is_symbol(char targetSymbol) {
+        return kind == TOKEN_SYMBOL && symbol == targetSymbol;
+    }
+
+    std::string describe() {
+        std::string content;
+        std::string desc;
+    
+        switch (kind) {
+            case TOKEN_KEYWORD:
+                content = text;
+                desc = "keyword";
+                break;
+            case TOKEN_SYMBOL:
+                if (symbol == '\n')
+                    content = "\\n";
+                else
+                    content = std::string(1, symbol);
+                desc = "symbol";
+                break;
+            case TOKEN_NUMBER:
+                content = std::to_string(num);
+                desc = "number";
+                break;
+            case TOKEN_IDENTIFIER:
+                content = text;
+                desc = "identifier";
+                break;
+            case TOKEN_EOF:
+                content = "EOF";
+                desc = "end of line";
+                break;
+            case BANGOLOO:
+                content = "TEXT: " + text + ", NUM: " + std::to_string(num) + ", SYMBOL: " + std::string(1, symbol);
+                desc = "BANGALOO";
+                break;
+            default: 
+                content = "?";
+                desc = "Unrecognized token enum value";
+                break;
+        }
+
+        return "'" + content + "' (" + desc + ")";
+    }
 }
+
+bool has_next() {
+    return current::kind != TOKEN_EOF;
+}
+
+void next();
 
 /*
     EXAMPLES & TESTS
 */
 
-int interactiveTokens() {
+int interactive() {
 
     std::cout << "Hello World" << std::endl;
 
@@ -126,9 +127,9 @@ int interactiveTokens() {
     printf("Anything that is none of the above is an 'other token'\n");
     printf("\n");
 
-    DebugTokens = true;
+    debug = true;
     while (true)
-        next_token();
+        next();
 
 }
 
@@ -141,131 +142,150 @@ int interactiveTokens() {
 
 // Moving through characters.
 
-static char CurrentChar;
-static bool HasCurrentChar = false;
+namespace {
+    namespace chars {
+        char current;
+        bool has_current = false;
 
-static void nextChar() {
-    int result = getchar();
-    HasCurrentChar = result != EOF;
-    
-    if (HasCurrentChar)
-        CurrentChar = result;
+        void next() {
+            int result = getchar();
+            has_current = result != EOF;
+            
+            if (has_current)
+                current = result;
+        }
+    }
 }
 
 // Moving through tokens.
 // These can be single characters, such as with key symbols.
 // Or they can be words, or numbers.
 
-// Getting a single token.
-static Token readToken();
+namespace {
+    // Getting a single token.
+    void read_token();
+}
 
 // Moving the CurrentToken to the next single token.
 // Newlines are counted as SYMBOL tokens here.
-static void next_token() {
-    CurrentToken = readToken();
+void next() {
+    read_token();
     
-    if (DebugTokens) 
-        printf("%s\n", describe_token().c_str());
+    if (debug) 
+        printf("%s\n", current::describe().c_str());
 }
 
 // Move the CurrentToken to the next single token.
 // Skips any newlines.
-static void nextSolidToken() {
-    next_token();
-    while (has_next_token() && is_symbol('\n'))
-        next_token();
+void next_solid() {
+    next();
+    while (has_next() && current::is_symbol('\n'))
+        next();
 }
 
-// Read in a single token from the command line.
-static Token readToken() {
+namespace {
+    // Read in a single token from the command line.
+    void read_token() {
 
-    // Make sure there is a current char.
-    if (!HasCurrentChar)
-        nextChar();
+        // Make sure there is a current char.
+        if (!chars::has_current)
+            chars::next();
 
-    // If there still isn't one, then it means EOF has been reached.
-    if (!HasCurrentChar) {
-        return TOKEN_EOF;
-    }
+        // If there still isn't one, then it means EOF has been reached.
+        if (!chars::has_current) {
+            current::kind = TOKEN_EOF;
+            return;
+        }
 
-    // Deal with whitespace. The precise behaviour here is subtle.
-    // - Any whitespace other than '\n' is ignored
-    // - When '\n' is enountered, it is returned as a symbol
-    // - However, after returning '\n', any more whitespace (including newlines!)
-    // after that is ignored until the next non-newline token.
-    
-
-    if (is_symbol('\n')) {
-        while (HasCurrentChar && isspace(CurrentChar))
-            nextChar();
-    }
-    else {
-        while (HasCurrentChar && isspace(CurrentChar) && CurrentChar != '\n')
-            nextChar();
+        // Deal with whitespace. The precise behaviour here is subtle.
+        // - Any whitespace other than '\n' is ignored
+        // - When '\n' is enountered, it is returned as a symbol
+        // - However, after returning '\n', any more whitespace (including newlines!)
+        // after that is ignored until the next non-newline token.
         
-        if (CurrentChar == '\n') {
-            TokenChar = '\n';
-
-            // DO NOT move past this newline!
-            // nextChar()
-
-            // The current token is now a newline, so in the 
-            // next call to this function, all whitespace will 
-            // be skipped anyways. 
-
-            // Meanwhile, nextChar() would cause a pause until the entire
-            // next line is input by the next user, since input is buffered
-            // between newlines.
-
-            return TOKEN_SYMBOL;
+        // Note: current::is_symbol refers to the latest token read, NOT the current character.
+        if (current::is_symbol('\n')) {
+            while (chars::has_current && isspace(chars::current))
+                chars::next();
         }
-    }
+        else {
+            while (chars::has_current && isspace(chars::current) && chars::current != '\n')
+                chars::next();
+            
+            if (chars::current == '\n') {
+                current::symbol = '\n';
 
-    // After moving past whitespace, EOF may have been reached.
-    if (!HasCurrentChar)
-        return TOKEN_EOF;
+                // DO NOT move past this newline!
+                // nextChar()
 
-    // Recognize keywords and identifiers
+                // The current token is now a newline, so in the 
+                // next call to this function, all whitespace will 
+                // be skipped anyways. 
 
-    if (isalpha(CurrentChar)) {
-        TokenStr = "";
-        while (isalnum(CurrentChar)) {
-            TokenStr += CurrentChar;
-            nextChar();
+                // Meanwhile, nextChar() would cause a pause until the entire
+                // next line is input by the next user, since input is buffered
+                // between newlines.
+
+                current::kind = TOKEN_SYMBOL;
+                return;
+            }
         }
 
-        if (TokenStr == "def" || TokenStr == "extern")
-            return TOKEN_KEYWORD;
-
-        return TOKEN_IDENTIFIER;
-    }
-
-    if (isdigit(CurrentChar) || CurrentChar == '.') {
-        std::string NumStr;
-        while (isdigit(CurrentChar) || CurrentChar == '.') {
-            NumStr += CurrentChar;
-            nextChar();
+        // After moving past whitespace, EOF may have been reached.
+        if (!chars::has_current) {
+            current::kind = TOKEN_EOF;
+            return;
         }
 
-        TokenNum = strtod(NumStr.c_str(), 0);
-        return TOKEN_NUMBER;
+        // Recognize keywords and identifiers
+
+        if (isalpha(chars::current)) {
+            current::text = "";
+            while (isalnum(chars::current)) {
+                current::text += chars::current;
+                chars::next();
+            }
+
+            if (current::text == "def" || current::text == "extern") {
+                current::kind = TOKEN_KEYWORD;
+                return;
+            }
+
+            current::kind = TOKEN_IDENTIFIER;
+            return;
+        }
+
+        if (isdigit(chars::current) || chars::current == '.') {
+            std::string NumStr;
+            while (isdigit(chars::current) || chars::current == '.') {
+                NumStr += chars::current;
+                chars::next();
+            }
+
+            current::num = strtod(NumStr.c_str(), 0);
+            current::kind = TOKEN_NUMBER;
+            return;
+        }
+
+        // Ignore the current line if it is a comment,
+        // and move straight to the next line. (Recursively)
+
+        if (chars::current == '#') {
+            while (chars::has_current && chars::current != '\n')
+                chars::next();
+            
+            return read_token();
+        }
+
+        // If the character is not recognized as a token,
+        // return it as a character. i.e. Key symbol.
+
+        current::symbol = chars::current;
+        chars::next(); // Move past the symbol.
+        current::kind = TOKEN_SYMBOL;
+        return;
+
     }
-
-    // Ignore the current line if it is a comment,
-    // and move straight to the next line. (Recursively)
-
-    if (CurrentChar == '#') {
-        while (HasCurrentChar && CurrentChar != '\n')
-            nextChar();
-        
-        return readToken();
-    }
-
-    // If the character is not recognized as a token,
-    // return it as a character. i.e. Key symbol.
-
-    TokenChar = CurrentChar;
-    nextChar(); // Move past the symbol.
-    return TOKEN_SYMBOL;
+}
 
 }
