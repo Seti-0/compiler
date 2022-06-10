@@ -239,7 +239,7 @@ static std::unique_ptr<ExprAST> parse_primary() {
         else if (tokens::current::is_symbol('('))
             return parse_group();
     } catch(...) {
-        throw std::runtime_error("Failed to parse expression primary.");
+        std::throw_with_nested(std::runtime_error("Failed to parse expression primary."));
     }
 
     throw std::runtime_error("Expected identifier, number, or '(', found unknown token instead.");
@@ -302,7 +302,7 @@ static std::unique_ptr<ExprAST> parse_rhs(
 
 // Call ::= Ref | FnCall
 static std::unique_ptr<ExprAST> parse_identifier() {
-    if (tokens::current::is(tokens::TOKEN_IDENTIFIER))
+    if (!tokens::current::is(tokens::TOKEN_IDENTIFIER))
         throw std::runtime_error("Tried to parse token that was not an identifier, as an identifier.");
     std::string name = tokens::current::text; // Use the current identifier token.
     tokens::next(); // Move on from the identifier.
