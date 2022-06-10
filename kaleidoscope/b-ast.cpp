@@ -2,11 +2,13 @@
 #include <iostream>
 #include <vector>
 
-// These definitions are used for part c, parsing.
+namespace ast {
 
-class ASTItem {
+// Item (abstract) on the abstract syntax tree.
+// This can be a node or a leaf.
+class Item {
 public:
-    virtual ~ASTItem() {}
+    virtual ~Item() {}
 
     virtual std::string to_string() {
         return "NOT IMPLEMENTED";
@@ -17,75 +19,74 @@ public:
     }
 };
 
-// Abstract statement
-
-class StatementAST : public ASTItem {
+// Statement. (Abstract)
+// A statement can be executed to cause sideeffects. 
+// It does not have a value.
+class Statement : public Item {
 public:
-    virtual ~StatementAST() {}
+    virtual ~Statement() {}
 };
 
-// Abstract expression
-
-class ExprAST : public ASTItem {
+// Expression. (Abstract)
+// An expression can be evaluated to yield a value.
+class Expr : public Item {
 public:
-    virtual ~ExprAST() {}
+    virtual ~Expr() {}
 };
 
-// Numbers and identifiers
-
-class NumberExprAST : public ExprAST {
+// Number.
+class Num : public Expr {
     double Val;
 
 public:
-    NumberExprAST(double Val) : Val(Val) {}
+    Num(double Val) : Val(Val) {}
     
     std::string to_string() override {
         return "Num(" + std::to_string(Val) + ")";
     }
 };
 
-class VariableExprAST : public ExprAST {
+// Variable reference.
+class Var : public Expr {
     std::string Name;
 
 public:
-    VariableExprAST(const std::string &Name) : Name(Name) {}
+    Var(const std::string &Name) : Name(Name) {}
 
     std::string to_string() override {
         return "Var(" + Name + ")";
     }
 };
 
-// The binary operator - two expressions
-// and an operator id
-
-class BinaryExprAST : public ExprAST {
-    char Op;
-    std::unique_ptr<ExprAST> LHS, RHS;
+// Binary Operator. 
+// Two expressions and an operator id.
+class Op : public Expr {
+    char op;
+    std::unique_ptr<Expr> LHS, RHS;
 
 public:
-    BinaryExprAST(
+    Op(
         char op, 
-        std::unique_ptr<ExprAST> LHS,
-        std::unique_ptr<ExprAST> RHS
-    ) : Op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
+        std::unique_ptr<Expr> LHS,
+        std::unique_ptr<Expr> RHS
+    ) : op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
 
     std::string to_string() override {
-        std::string symbol = std::string(1, Op);
+        std::string symbol = std::string(1, op);
         auto args = symbol + ", " + LHS->to_string() + ", " + RHS->to_string();
         return "Bin(" + args + ")";
     }
 };
 
-// Function calls and definitions
-
-class CallExprAST : public ExprAST {
+// Function call.
+class Call : public Expr {
     std::string Callee;
-    std::vector<std::unique_ptr<ExprAST>> Args;
+    std::vector<std::unique_ptr<Expr>> Args;
 
 public:
-    CallExprAST(
+    Call(
         const std::string &Callee,
-        std::vector<std::unique_ptr<ExprAST>> Args
+        std::vector<std::unique_ptr<Expr>> Args
     ) : Callee(Callee), Args(std::move(Args)) {}
 
     std::string to_string() override {
@@ -104,12 +105,14 @@ public:
     }
 };
 
-class PrototypeAST : public StatementAST {
+// Prototype. Used as a signature for
+// 'extern' and 'def' (function declaration) blocks.
+class Pro : public Statement {
     std::string Name;
     std::vector<std::string> Args;
 
 public:
-    PrototypeAST(
+    Pro(
         const std::string &name, 
         std::vector<std::string> Args
     ) : Name(name), Args(std::move(Args)) {}
@@ -132,17 +135,21 @@ public:
     }
 };
 
-class FunctionAST : public StatementAST {
-    std::unique_ptr<PrototypeAST> Proto;
-    std::unique_ptr<ExprAST> Body;
+// Function declaration. 
+// Has a prototype (signature) and an expression body.
+class Fn : public Statement {
+    std::unique_ptr<Pro> proto;
+    std::unique_ptr<Expr> body;
 
     public:
-        FunctionAST(
-            std::unique_ptr<PrototypeAST> Proto,
-            std::unique_ptr<ExprAST> Body
-        ) : Proto(std::move(Proto)), Body(std::move(Body)) {}
+        Fn(
+            std::unique_ptr<Pro> proto,
+            std::unique_ptr<Expr> body
+        ) : proto(std::move(proto)), body(std::move(body)) {}
 
     std::string to_string() override {
-        return "Fn(" + Proto->to_string() + ", " + Body->to_string() + ")";
+        return "Fn(" + proto->to_string() + ", " + body->to_string() + ")";
     }
 };
+
+}
