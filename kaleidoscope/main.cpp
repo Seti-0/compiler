@@ -4,8 +4,8 @@
 #include <memory>
 #include <map>
 
-// #include "a-tokens.cpp"
-#include "c-parsing.cpp"
+// #include "compiler/tokens.cpp"
+#include "compiler/parsing.cpp"
 
 int main() {
     //tokens::interactive();
