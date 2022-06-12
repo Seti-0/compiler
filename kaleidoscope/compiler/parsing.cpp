@@ -136,6 +136,7 @@ namespace {
             return result;
         } catch (...) {
             util::rethrow(__func__);
+            return nullptr;
         }
     }
 
@@ -149,6 +150,7 @@ namespace {
             return std::make_unique<ast::Fn>(std::move(proto), std::move(E));
         } catch(...) {
             util::rethrow(__func__);
+            return nullptr;
         }
     }
 
@@ -167,6 +169,7 @@ namespace {
             return fn;
         } catch(...) {
             util::rethrow(__func__);
+            return nullptr;
         }
     }
             
@@ -180,6 +183,7 @@ namespace {
             return parse_prototype();
         } catch(...) {
             util::rethrow(__func__);
+            return nullptr;
         }
     }
 
@@ -221,6 +225,7 @@ namespace {
             return parse_rhs(0, std::move(LHS));
         } catch(...) {
             util::rethrow(__func__);
+            return nullptr;
         }
     }
 
@@ -239,6 +244,7 @@ namespace {
                 return parse_group();
         } catch(...) {
             util::rethrow(__func__);
+            return nullptr;
         }
 
         throw std::runtime_error("Expected identifier, number, or '(', found unknown token instead.");
@@ -296,6 +302,7 @@ namespace {
                 rhs = parse_primary();
             } catch(...) {
                 util::rethrow(__func__);
+                return nullptr;
             }
 
             // If binary_op binds less tightly with RHS than the operator after RHS, let
@@ -357,6 +364,7 @@ namespace {
             expression = parse_expr();
         } catch(...) {
             util::rethrow(__func__);
+            return nullptr;
         }
         
         if (!tokens::current::is_symbol(')'))

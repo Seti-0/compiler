@@ -1,0 +1,9 @@
+# Build output.
+*.exe
+build/
+
+# File for misc experiments.
+./test.cpp
+
+# VSCode config
+.vscode/
