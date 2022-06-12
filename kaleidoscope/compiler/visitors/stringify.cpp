@@ -22,16 +22,26 @@ public:
 
     void visit_op(ast::Op& target) override {
         std::string symbol = std::string(1, target.op);
-        std::string args = symbol + ", " + target.LHS->to_string() + ", " + target.RHS->to_string();
+
+        target.LHS->visit(*this);
+        std::string lhs = result;
+
+        target.RHS->visit(*this);
+        std::string rhs = result;
+
+        std::string args = symbol + ", " + lhs + ", " + rhs;
         result = "Bin(" + args + ")";
     }
 
     void visit_call(ast::Call& target) override {
         std::string args = "(";
         if (target.Args.size() > 0) {
-            args += target.Args[0]->to_string();
-            for (int i = 1; i < target.Args.size(); i++)   
-                args += ", " + target.Args[i]->to_string();
+            target.Args[0]->visit(*this);
+            args += result;
+            for (int i = 1; i < target.Args.size(); i++) {
+                target.Args[i]->visit(*this);
+                args += ", " + result;
+            }
         }
         args += ")";
         result = "Call(" + target.Callee + ", " + args + ")";
@@ -49,6 +59,12 @@ public:
     }
 
     void visit_fn(ast::Fn& target) override {
-        result = "Fn(" + target.proto->to_string() + ", " + target.body->to_string() + ")";
+        target.proto->visit(*this);
+        std::string proto = result;
+
+        target.body->visit(*this);
+        std::string body = result;
+
+        result = "Fn(" + proto + ", " + body + ")";
     }
 };

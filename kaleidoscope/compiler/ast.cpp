@@ -6,16 +6,8 @@
 
 #include "visitor.h"
 #include "ast.h"
-#include "visitors/stringify.cpp"
 
 namespace ast {
-
-    std::string Item::to_string() {
-        Stringifier stringifier;
-        visit(stringifier);
-        return stringifier.getResult();
-    }
-
     void Num::visit(Visitor& visitor) {
         visitor.visit_num(*this);
     }
@@ -39,5 +31,4 @@ namespace ast {
     void Fn::visit(Visitor& visitor) {
         visitor.visit_fn(*this);
     }
-
 }

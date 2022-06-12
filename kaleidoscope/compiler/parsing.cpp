@@ -9,6 +9,7 @@
 
 #include "tokens.cpp"
 #include "ast.cpp"
+#include "visitors/stringify.cpp"
 
 namespace expr {
 
@@ -51,7 +52,7 @@ bool has_next() {
 }
 
 namespace {
-    void print_exception(const std::exception&, int);
+    void print_exception(const std::exception&);
     std::unique_ptr<ast::Statement> parse_statement();
 }
 
@@ -73,7 +74,7 @@ std::unique_ptr<ast::Statement> input(std::string promt) {
     try {
         result = parse_statement();
     } catch (std::exception& e) {
-        print_exception(e, 0);
+        print_exception(e);
         printf("(Error Token: %s)\n", tokens::current::describe().c_str());
 
         // After an error, skip past the rest of the line.
@@ -91,16 +92,41 @@ namespace {
         EXCEPTIONS
     */
 
-    void print_exception(const std::exception& e, int level=0) {
-        printf("%s Error: %s\n", std::string(level, ' ').c_str(),  e.what());
+    void rethrow(std::string name, std::string msg)
+    {
+        std::string text = name;
+        if (msg.length() > 0)
+            text += ": " + msg;
+
+        try {
+            std::rethrow_exception(std::current_exception());
+        }
+        catch(...) {
+            std::throw_with_nested(std::runtime_error(text));
+        }
+    }
+
+    void rethrow(std::string name) {
+        rethrow(name, "");
+    }
+
+    void print_exception(const std::exception& e, int level) {
+        if (level == 0)
+            printf("Error: ");
+        else 
+            printf(" -> ");
+        printf(e.what());
         
-        // This is an odd one, I'm not sure if there is a better way to do it.
-        // See: https://en.cppreference.com/w/cpp/error/nested_exception
         try {
             std::rethrow_if_nested(e);
+            printf("\n");
         } catch (const std::exception& e) {
-            print_exception(e, level+1);
+            print_exception(e, level + 1);
         }
+    }
+
+    void print_exception(const std::exception& e) {
+        print_exception(e, 0);
     }
 
     /*
@@ -144,12 +170,15 @@ namespace {
                 result = parse_top_level_expr();
 
             if (result) {
-                if (debug) 
-                    printf("Expression: %s\n", result.get()->to_string().c_str());
+                if (debug) {
+                    Stringifier stringifier;
+                    result.get()->visit(stringifier);
+                    printf("Expression: %s\n", stringifier.getResult().c_str());
+                }
             }
             return result;
         } catch (...) {
-            std::throw_with_nested(std::runtime_error("Failed to parse statement."));
+            rethrow(__func__);
         }
     }
 
@@ -162,7 +191,7 @@ namespace {
             auto proto = std::make_unique<ast::Pro>("", std::vector<std::string>());
             return std::make_unique<ast::Fn>(std::move(proto), std::move(E));
         } catch(...) {
-            std::throw_with_nested(std::runtime_error("Failed to parse top level expression."));
+            rethrow(__func__);
         }
     }
 
@@ -180,7 +209,7 @@ namespace {
             std::unique_ptr<ast::Fn> fn = std::make_unique<ast::Fn>(std::move(proto), std::move(expression));
             return fn;
         } catch(...) {
-            std::throw_with_nested(std::runtime_error("Failed to parse function definition."));
+            rethrow(__func__);
         }
     }
             
@@ -193,7 +222,7 @@ namespace {
         try {
             return parse_prototype();
         } catch(...) {
-            std::throw_with_nested(std::runtime_error("Failed to parse extern definition."));
+            rethrow(__func__);
         }
     }
 
@@ -234,7 +263,7 @@ namespace {
             auto LHS = parse_primary();
             return parse_rhs(0, std::move(LHS));
         } catch(...) {
-            std::throw_with_nested(std::runtime_error("Failed to parse expression."));
+            rethrow(__func__);
         }
     }
 
@@ -252,7 +281,7 @@ namespace {
             else if (tokens::current::is_symbol('('))
                 return parse_group();
         } catch(...) {
-            std::throw_with_nested(std::runtime_error("Failed to parse expression primary."));
+            rethrow(__func__);
         }
 
         throw std::runtime_error("Expected identifier, number, or '(', found unknown token instead.");
@@ -305,7 +334,12 @@ namespace {
             tokens::next(); // Move on past the operator.
 
             // Parse the primary expression after the binary operator.
-            auto rhs = parse_primary();
+            std::unique_ptr<ast::Expr> rhs;
+            try {
+                rhs = parse_primary();
+            } catch(...) {
+                rethrow(__func__);
+            }
 
             // If binary_op binds less tightly with RHS than the operator after RHS, let
             // the pending operator take RHS as its LHS.
@@ -365,7 +399,7 @@ namespace {
         try {
             expression = parse_expr();
         } catch(...) {
-            std::throw_with_nested(std::runtime_error("Failed to parse expression group."));
+            rethrow(__func__);
         }
         
         if (!tokens::current::is_symbol(')'))

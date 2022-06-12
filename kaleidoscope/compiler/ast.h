@@ -22,7 +22,6 @@ namespace ast {
     class Item {
     public:
         virtual void visit(Visitor& visitor) = 0;
-        std::string to_string();
     };
 
     // Statement. (Abstract)
