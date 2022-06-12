@@ -9,6 +9,7 @@
 
 #include "tokens.cpp"
 #include "ast.cpp"
+#include "utility.cpp"
 #include "visitors/stringify.cpp"
 
 namespace expr {
@@ -52,7 +53,6 @@ bool has_next() {
 }
 
 namespace {
-    void print_exception(const std::exception&);
     std::unique_ptr<ast::Statement> parse_statement();
 }
 
@@ -74,7 +74,7 @@ std::unique_ptr<ast::Statement> input(std::string promt) {
     try {
         result = parse_statement();
     } catch (std::exception& e) {
-        print_exception(e);
+        util::print_exception(e);
         printf("(Error Token: %s)\n", tokens::current::describe().c_str());
 
         // After an error, skip past the rest of the line.
@@ -89,51 +89,8 @@ std::unique_ptr<ast::Statement> input(std::string promt) {
 
 namespace {
     /*
-        EXCEPTIONS
-    */
-
-    void rethrow(std::string name, std::string msg)
-    {
-        std::string text = name;
-        if (msg.length() > 0)
-            text += ": " + msg;
-
-        try {
-            std::rethrow_exception(std::current_exception());
-        }
-        catch(...) {
-            std::throw_with_nested(std::runtime_error(text));
-        }
-    }
-
-    void rethrow(std::string name) {
-        rethrow(name, "");
-    }
-
-    void print_exception(const std::exception& e, int level) {
-        if (level == 0)
-            printf("Error: ");
-        else 
-            printf(" -> ");
-        printf(e.what());
-        
-        try {
-            std::rethrow_if_nested(e);
-            printf("\n");
-        } catch (const std::exception& e) {
-            print_exception(e, level + 1);
-        }
-    }
-
-    void print_exception(const std::exception& e) {
-        print_exception(e, 0);
-    }
-
-    /*
         PARSING
-    */
 
-    /*
         Summary.
         I'm using lowercase for raw tokens,
         and capitals for named subexpressions.
@@ -178,7 +135,7 @@ namespace {
             }
             return result;
         } catch (...) {
-            rethrow(__func__);
+            util::rethrow(__func__);
         }
     }
 
@@ -191,7 +148,7 @@ namespace {
             auto proto = std::make_unique<ast::Pro>("", std::vector<std::string>());
             return std::make_unique<ast::Fn>(std::move(proto), std::move(E));
         } catch(...) {
-            rethrow(__func__);
+            util::rethrow(__func__);
         }
     }
 
@@ -209,7 +166,7 @@ namespace {
             std::unique_ptr<ast::Fn> fn = std::make_unique<ast::Fn>(std::move(proto), std::move(expression));
             return fn;
         } catch(...) {
-            rethrow(__func__);
+            util::rethrow(__func__);
         }
     }
             
@@ -222,7 +179,7 @@ namespace {
         try {
             return parse_prototype();
         } catch(...) {
-            rethrow(__func__);
+            util::rethrow(__func__);
         }
     }
 
@@ -263,7 +220,7 @@ namespace {
             auto LHS = parse_primary();
             return parse_rhs(0, std::move(LHS));
         } catch(...) {
-            rethrow(__func__);
+            util::rethrow(__func__);
         }
     }
 
@@ -281,7 +238,7 @@ namespace {
             else if (tokens::current::is_symbol('('))
                 return parse_group();
         } catch(...) {
-            rethrow(__func__);
+            util::rethrow(__func__);
         }
 
         throw std::runtime_error("Expected identifier, number, or '(', found unknown token instead.");
@@ -338,7 +295,7 @@ namespace {
             try {
                 rhs = parse_primary();
             } catch(...) {
-                rethrow(__func__);
+                util::rethrow(__func__);
             }
 
             // If binary_op binds less tightly with RHS than the operator after RHS, let
@@ -399,7 +356,7 @@ namespace {
         try {
             expression = parse_expr();
         } catch(...) {
-            rethrow(__func__);
+            util::rethrow(__func__);
         }
         
         if (!tokens::current::is_symbol(')'))
