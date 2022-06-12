@@ -8,10 +8,6 @@
 
 namespace tokens {
 
-// I don't really know how to use includes/header
-// files yet, hence the simplestic approach to inclusion
-// used in this project.
-
 // If this is true, a description of each
 // token read will be displayed.
 bool debug = false;

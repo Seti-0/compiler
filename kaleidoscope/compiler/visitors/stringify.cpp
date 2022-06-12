@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../ast.h"
+#include "../ast.cpp"
 #include "../visitor.h"
 
 class Stringifier : public Visitor {
