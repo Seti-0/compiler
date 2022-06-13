@@ -7,3 +7,7 @@ build/
 
 # VSCode config
 .vscode/
+
+# Include headers for intellisense
+llvm/
+llvm-c/

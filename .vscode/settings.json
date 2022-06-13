@@ -47,5 +47,6 @@
         "map": "cpp",
         "xtree": "cpp",
         "sstream": "cpp"
-    }
+    },
+    "cmake.sourceDirectory": "${workspaceFolder}/kaleidoscope"
 }
