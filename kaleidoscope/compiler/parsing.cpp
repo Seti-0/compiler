@@ -20,12 +20,12 @@ bool debug = false;
     EXAMPLE
 */
 
-void setup_precedence();
+void init();
 bool has_next();
 std::unique_ptr<ast::Statement> input(std::string);
 
 void interactive() {
-    setup_precedence();
+    init();
     debug = true;
 
     printf("\n");
@@ -45,6 +45,14 @@ void interactive() {
         input("ready");
 
     printf("Info: end of input reached, exiting.\n");
+}
+
+namespace {
+    void setup_precedence();
+}
+
+void init() {
+    setup_precedence();
 }
 
 bool has_next() {
@@ -263,21 +271,19 @@ namespace {
 
         return operator_precedence[tokens::current::symbol];
     }
-}
 
-void setup_precedence() {
-    // TODO: extend this for other ops!
-    operator_precedence['^'] = 11;
-    operator_precedence['*'] = 10;
-    operator_precedence['/'] = 10;
-    operator_precedence['+'] = 9;
-    operator_precedence['-'] = 9;
-    operator_precedence['<'] = 8;
-    operator_precedence['>'] = 8;
-    operator_precedence['='] = 7;
-}
+    void setup_precedence() {
+        // TODO: extend this for other ops!
+        operator_precedence['^'] = 11;
+        operator_precedence['*'] = 10;
+        operator_precedence['/'] = 10;
+        operator_precedence['+'] = 9;
+        operator_precedence['-'] = 9;
+        operator_precedence['<'] = 8;
+        operator_precedence['>'] = 8;
+        operator_precedence['='] = 7;
+    }
 
-namespace {
     std::unique_ptr<ast::Expr> parse_rhs(
         int expr_precedence,
         std::unique_ptr<ast::Expr> lhs

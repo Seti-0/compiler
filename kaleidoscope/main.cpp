@@ -1,11 +1,12 @@
+#pragma once
+
 #include <string>
 #include <iostream>
 #include <vector>
 #include <memory>
 #include <map>
 
-// #include "compiler/tokens.cpp"
-#include "compiler/parsing.cpp"
+#include "compiler/generation.cpp"
 
 // As I understand it, there was an errant (unlisted) breaking change for visual c++ and a specific api.
 // This tells the linker that there is a new name for the two functions changed.
@@ -20,6 +21,5 @@
 #endif
 
 int main() {
-    //tokens::interactive();
-    expr::interactive();
+    gen::interactive();
 }
