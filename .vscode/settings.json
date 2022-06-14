@@ -46,7 +46,16 @@
         "xutility": "cpp",
         "map": "cpp",
         "xtree": "cpp",
-        "sstream": "cpp"
+        "sstream": "cpp",
+        "algorithm": "cpp",
+        "array": "cpp",
+        "bitset": "cpp",
+        "functional": "cpp",
+        "list": "cpp",
+        "random": "cpp",
+        "set": "cpp",
+        "unordered_map": "cpp",
+        "xhash": "cpp"
     },
     "cmake.sourceDirectory": "${workspaceFolder}/kaleidoscope"
 }

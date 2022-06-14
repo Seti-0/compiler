@@ -21,5 +21,6 @@
 #endif
 
 int main() {
+    printf("V4\n");
     gen::interactive();
 }
