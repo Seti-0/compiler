@@ -21,6 +21,7 @@
 #endif
 
 int main() {
-    printf("V7\n");
-    gen::interactive();
+    printf("V1\n");
+    llvm::ExitOnError exit_on_err;
+    exit_on_err(gen::interactive());
 }

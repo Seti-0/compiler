@@ -65,7 +65,7 @@ namespace jit {
             if (!layout)
                 return layout.takeError();
             
-            return std::make_unique<JIT>(std::move(session), std::move(builder), std::move(layout));
+            return std::make_unique<JIT>(std::move(session), builder, layout.get());
         }
 
         const llvm::DataLayout& getDataLayout() const {

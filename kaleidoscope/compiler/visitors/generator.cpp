@@ -24,19 +24,33 @@
 
 namespace gen {
     namespace {
-        std::unique_ptr<llvm::LLVMContext> context = std::make_unique<llvm::LLVMContext>();
-        std::unique_ptr<llvm::IRBuilder<>> builder = std::make_unique<llvm::IRBuilder<>>(*context);
-        std::unique_ptr<llvm::Module> mod = std::make_unique<llvm::Module>("main", *context);
+        std::unique_ptr<llvm::LLVMContext> context;
+        std::unique_ptr<llvm::Module> mod;
+        std::unique_ptr<llvm::IRBuilder<>> builder;
 
         // I'm not sure what replaces the legacy pass manager used in the tutorial below.
         // The legacy stuff seems to work well enough, anyways.
         // See: https://llvm.org/docs/tutorial/MyFirstLanguageFrontend/LangImpl04.html
-        std::unique_ptr<jit::JIT> jit = std::make_unique<jit::JIT>();
         std::unique_ptr<llvm::legacy::FunctionPassManager> fn_pass_manager;
 
+        std::unique_ptr<jit::JIT> jit;
+
+        llvm::Error init_jit() {
+            auto expected_jit = jit::JIT::create();
+            if (!expected_jit)
+                return expected_jit.takeError();
+
+            jit = std::move(expected_jit.get());
+            return llvm::Error::success();
+        }
+
         void reset_module() {
+            context = std::make_unique<llvm::LLVMContext>();
             mod = std::make_unique<llvm::Module>("main", *context);
-            mod->setDataLayout(jit->getDataLayout());            
+            mod->setDataLayout(jit->getDataLayout()); 
+            
+            builder = std::make_unique<llvm::IRBuilder<>>(*context);
+           
             fn_pass_manager = std::make_unique<llvm::legacy::FunctionPassManager>(mod.get());
 
             // Combine insustructions, without changing the control flow graph

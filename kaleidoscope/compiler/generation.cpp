@@ -3,11 +3,21 @@
 #include "parsing.cpp"
 #include "ast.cpp"
 
+#include "llvm/Support/Error.h"
+#include "llvm/Support/TargetSelect.h"
+
 #include "visitors/generator.cpp"
 
 namespace gen {
-    void init() {
+    llvm::Error init() {
+        llvm::InitializeNativeTarget();
+        llvm::InitializeNativeTargetAsmPrinter();
+        llvm::InitializeNativeTargetAsmParser();
+
+        if (auto error = init_jit())
+            return error;
         reset_module();
+        return llvm::Error::success();
     }
 
     llvm::Error interactive() {
@@ -23,7 +33,8 @@ namespace gen {
         expr::init();
         expr::debug = true;
 
-        init();
+        if (auto error = init())
+            return error;
 
         Generator generator;
 
@@ -44,22 +55,26 @@ namespace gen {
             //mod->print(llvm::outs(), nullptr);
 
             llvm::orc::ResourceTrackerSP tracker = jit->getMainJITDyLib().createResourceTracker();
+            if (auto error = jit->addModule(std::move(llvm::orc::ThreadSafeModule(std::move(mod), std::move(context))), tracker))
+                return error;
 
-            llvm::orc::ThreadSafeModule thread_safe_mod = 
-                llvm::orc::ThreadSafeModule(std::move(mod), std::move(context));
+            auto expected_symbol = jit->lookup("main");
+            if (!expected_symbol)
+                return expected_symbol.takeError();
 
-            if (auto error = jit->addModule(std::move(thread_safe_mod), tracker))
+            auto symbol = expected_symbol.get();
+            double (*result)() = (double (*)())(intptr_t)(symbol.getAddress());
+
+            printf("Result: %f\n", result());
+
+            if (auto error = tracker->remove())
                 return error;
 
             // Once the module has been moved into the jit above, it is frozen and of 
             // no use to the generator. Replace it with a new one.
             reset_module();
-
-            auto symbol = jit->lookup("__anon_expr");
-            
-
-            printf("Result: ");
-
         }
+
+        return llvm::Error::success();
     }
 }

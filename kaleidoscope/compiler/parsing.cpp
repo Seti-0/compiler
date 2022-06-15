@@ -154,7 +154,7 @@ namespace {
     std::unique_ptr<ast::Fn> parse_top_level_expr() {
         try {
             auto E = parse_expr();
-            auto proto = std::make_unique<ast::Pro>("", std::vector<std::string>());
+            auto proto = std::make_unique<ast::Pro>("main", std::vector<std::string>());
             return std::make_unique<ast::Fn>(std::move(proto), std::move(E));
         } catch(...) {
             util::rethrow(__func__);
