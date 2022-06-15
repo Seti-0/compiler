@@ -21,6 +21,6 @@
 #endif
 
 int main() {
-    printf("V4\n");
+    printf("V7\n");
     gen::interactive();
 }

@@ -42,7 +42,7 @@ void interactive() {
     printf("\n");
 
     while (has_next())
-        input("ready");
+        input("parsing");
 
     printf("Info: end of input reached, exiting.\n");
 }
