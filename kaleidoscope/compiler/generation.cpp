@@ -6,6 +6,10 @@
 #include "visitors/generator.cpp"
 
 namespace gen {
+    void init() {
+        init_passes();
+    }
+
     void interactive() {
         printf("IR Generation\n");
         printf("\n");
@@ -18,6 +22,8 @@ namespace gen {
 
         expr::init();
         expr::debug = true;
+
+        init();
 
         Generator generator;
 
@@ -43,5 +49,5 @@ namespace gen {
                 continue;
             }
         }
-    }    
+    }
 }

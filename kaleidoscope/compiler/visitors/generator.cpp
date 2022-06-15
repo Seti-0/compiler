@@ -15,12 +15,35 @@
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/Transforms/InstCombine/InstCombine.h"
+#include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/GVN.h"
 
 namespace gen {
     namespace {
         std::unique_ptr<llvm::LLVMContext> context = std::make_unique<llvm::LLVMContext>();
         std::unique_ptr<llvm::IRBuilder<>> builder = std::make_unique<llvm::IRBuilder<>>(*context);
         std::unique_ptr<llvm::Module> mod = std::make_unique<llvm::Module>("main", *context);
+
+        // This is legacy, but I'm not sure the new version is complete yet or
+        // how to access it.
+        // See: https://llvm.org/docs/tutorial/MyFirstLanguageFrontend/LangImpl04.html
+        std::unique_ptr<llvm::legacy::FunctionPassManager> fn_pass_manager 
+            = std::make_unique<llvm::legacy::FunctionPassManager>(mod.get());
+        
+        void init_passes() {
+            // Combine insustructions, without changing the control flow graph
+            fn_pass_manager->add(llvm::createInstructionCombiningPass());
+            // Reassociate expressions (re-order brackets) to help with later expression-related passes
+            fn_pass_manager->add(llvm::createReassociatePass());
+            // Eliminate common subexpressions
+            fn_pass_manager->add(llvm::createGVNPass());
+            // Control flow simplification (e.g. removing unused code blocks)
+            fn_pass_manager->add(llvm::createCFGSimplificationPass());
+
+            fn_pass_manager->doInitialization();
+        }
 
         class Generator: public Visitor {
         private:
@@ -142,6 +165,11 @@ namespace gen {
 
                 builder->CreateRet(result);
                 llvm::verifyFunction(*fn);
+                
+                // Run optimization passes on the function, such as re-writing expressions
+                // or eliminating dead code.
+                fn_pass_manager->run(*fn);
+                
                 result = fn;
             }
         };
