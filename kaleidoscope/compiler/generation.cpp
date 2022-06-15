@@ -7,10 +7,10 @@
 
 namespace gen {
     void init() {
-        init_passes();
+        reset_module();
     }
 
-    void interactive() {
+    llvm::Error interactive() {
         printf("IR Generation\n");
         printf("\n");
         printf("Examples:\n");
@@ -35,19 +35,31 @@ namespace gen {
             try {
                 current->visit(generator);
             } catch(std::exception& e) {
-                printf("Failed to generate code.\n");
                 util::print_exception(e);
                 continue;
             }
 
-            try {
-                printf("IR: ");
-                generator.get_result()->print(llvm::outs());
-            } catch(std::exception& e) {
-                printf("Failed to print result.\n");
-                util::print_exception(e);
-                continue;
-            }
+            printf("IR: ");
+            generator.get_result()->print(llvm::outs());
+            //mod->print(llvm::outs(), nullptr);
+
+            llvm::orc::ResourceTrackerSP tracker = jit->getMainJITDyLib().createResourceTracker();
+
+            llvm::orc::ThreadSafeModule thread_safe_mod = 
+                llvm::orc::ThreadSafeModule(std::move(mod), std::move(context));
+
+            if (auto error = jit->addModule(std::move(thread_safe_mod), tracker))
+                return error;
+
+            // Once the module has been moved into the jit above, it is frozen and of 
+            // no use to the generator. Replace it with a new one.
+            reset_module();
+
+            auto symbol = jit->lookup("__anon_expr");
+            
+
+            printf("Result: ");
+
         }
     }
 }

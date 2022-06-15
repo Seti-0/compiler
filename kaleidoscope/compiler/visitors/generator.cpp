@@ -7,6 +7,8 @@
 #include "../ast.cpp"
 #include "../utility.cpp"
 
+#include "../jit.cpp"
+
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
@@ -26,13 +28,17 @@ namespace gen {
         std::unique_ptr<llvm::IRBuilder<>> builder = std::make_unique<llvm::IRBuilder<>>(*context);
         std::unique_ptr<llvm::Module> mod = std::make_unique<llvm::Module>("main", *context);
 
-        // This is legacy, but I'm not sure the new version is complete yet or
-        // how to access it.
+        // I'm not sure what replaces the legacy pass manager used in the tutorial below.
+        // The legacy stuff seems to work well enough, anyways.
         // See: https://llvm.org/docs/tutorial/MyFirstLanguageFrontend/LangImpl04.html
-        std::unique_ptr<llvm::legacy::FunctionPassManager> fn_pass_manager 
-            = std::make_unique<llvm::legacy::FunctionPassManager>(mod.get());
-        
-        void init_passes() {
+        std::unique_ptr<jit::JIT> jit = std::make_unique<jit::JIT>();
+        std::unique_ptr<llvm::legacy::FunctionPassManager> fn_pass_manager;
+
+        void reset_module() {
+            mod = std::make_unique<llvm::Module>("main", *context);
+            mod->setDataLayout(jit->getDataLayout());            
+            fn_pass_manager = std::make_unique<llvm::legacy::FunctionPassManager>(mod.get());
+
             // Combine insustructions, without changing the control flow graph
             fn_pass_manager->add(llvm::createInstructionCombiningPass());
             // Reassociate expressions (re-order brackets) to help with later expression-related passes
