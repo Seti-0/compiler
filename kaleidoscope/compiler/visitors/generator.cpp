@@ -28,6 +28,9 @@ namespace gen {
         std::unique_ptr<llvm::Module> mod;
         std::unique_ptr<llvm::IRBuilder<>> builder;
 
+        std::map<std::string, llvm::Value*> named_values;
+        std::map<std::string, std::unique_ptr<ast::Pro>> prototypes;
+
         // I'm not sure what replaces the legacy pass manager used in the tutorial below.
         // The legacy stuff seems to work well enough, anyways.
         // See: https://llvm.org/docs/tutorial/MyFirstLanguageFrontend/LangImpl04.html
@@ -67,12 +70,25 @@ namespace gen {
 
         class Generator: public Visitor {
         private:
-            std::map<std::string, llvm::Value*> named_values;
             llvm::Value* result;
 
         public:
             llvm::Value* get_result() {
                 return result;
+            }
+
+
+            llvm::Function* get_fn(std::string name) {
+                if (llvm::Function* existing = mod->getFunction(name))
+                    return existing;
+
+                auto iterator = prototypes.find(name);
+                if (iterator != prototypes.end()) {
+                    iterator->second->visit(*this);
+                    return static_cast<llvm::Function*>(result);
+                }
+
+                return nullptr;
             }
 
             void visit_num(ast::Num& target) override {
@@ -115,7 +131,7 @@ namespace gen {
             }
 
             void visit_call(ast::Call& target) override {
-                llvm::Function* fn = mod->getFunction(target.Callee);
+                llvm::Function* fn = get_fn(target.Callee);
                 if (!fn)
                     throw std::runtime_error("Unknown function: '" + target.Callee + "'.");
                 
@@ -152,16 +168,20 @@ namespace gen {
                     arg.setName(target.Args[i++]);
                 
                 result = fn;
+
+                prototypes[target.Name] = target.copy();
             }
 
             void visit_fn(ast::Fn& target) override {
+                ast::Pro& target_proto = *target.proto;
+
                 // This is so the user can redefine functions.
-                llvm::Function* fn = mod->getFunction(target.proto->Name);
+                llvm::Function* fn = get_fn(target_proto.Name);
                 if (fn)
                     fn->eraseFromParent();
 
                 try {
-                    target.proto->visit(*this);
+                    target_proto.visit(*this);
                 } catch(...) {
                     util::rethrow(__func__);
                     return;

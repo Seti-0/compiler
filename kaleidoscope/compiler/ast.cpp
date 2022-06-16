@@ -84,6 +84,16 @@ namespace ast {
         void visit(Visitor& visitor) override {
             visitor.visit_pro(*this);
         }
+
+        std::unique_ptr<Pro> copy() {
+            std::string new_name = Name;
+
+            std::vector<std::string> new_args;
+            for (std::string item: Args)
+                new_args.push_back(item);
+            
+            return std::make_unique<Pro>(new_name, new_args);
+        }
     };
 
     // Function declaration. 

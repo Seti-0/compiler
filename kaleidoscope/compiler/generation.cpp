@@ -55,20 +55,26 @@ namespace gen {
             //mod->print(llvm::outs(), nullptr);
 
             llvm::orc::ResourceTrackerSP tracker = jit->getMainJITDyLib().createResourceTracker();
-            if (auto error = jit->addModule(std::move(llvm::orc::ThreadSafeModule(std::move(mod), std::move(context))), tracker))
+            if (auto error = jit->addModule(std::move(llvm::orc::ThreadSafeModule(std::move(mod), std::move(context))), tracker)) {
+                printf("gen::interactive (add module) -> ");
                 return error;
+            }
 
-            auto expected_symbol = jit->lookup("main");
-            if (!expected_symbol)
-                return expected_symbol.takeError();
+            if (auto expected_symbol = jit->lookup("main")) {
+                // If a function called "main" has been defined, evaluate it and then
+                // remove it. Top level expressions, treated as expressions, are
+                // are given the name "main". A user could also define a function
+                // called "main", in which case it is also immediately evaluated and discarded.
+                auto symbol = expected_symbol.get();
+                double (*result)() = (double (*)())(intptr_t)(symbol.getAddress());
 
-            auto symbol = expected_symbol.get();
-            double (*result)() = (double (*)())(intptr_t)(symbol.getAddress());
+                printf("Result: %f\n", result());
 
-            printf("Result: %f\n", result());
-
-            if (auto error = tracker->remove())
-                return error;
+                if (auto error = tracker->remove()) {
+                    printf("gen::interactive: execute main -> ");
+                    return error;
+                }
+            } 
 
             // Once the module has been moved into the jit above, it is frozen and of 
             // no use to the generator. Replace it with a new one.
