@@ -16,7 +16,7 @@ namespace gen {
 
         if (auto error = init_jit())
             return error;
-        reset_module();
+        new_module();
         return llvm::Error::success();
     }
 
@@ -78,7 +78,7 @@ namespace gen {
 
             // Once the module has been moved into the jit above, it is frozen and of 
             // no use to the generator. Replace it with a new one.
-            reset_module();
+            new_module();
         }
 
         return llvm::Error::success();

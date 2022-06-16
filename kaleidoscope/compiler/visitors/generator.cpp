@@ -36,18 +36,7 @@ namespace gen {
         // See: https://llvm.org/docs/tutorial/MyFirstLanguageFrontend/LangImpl04.html
         std::unique_ptr<llvm::legacy::FunctionPassManager> fn_pass_manager;
 
-        std::unique_ptr<jit::JIT> jit;
-
-        llvm::Error init_jit() {
-            auto expected_jit = jit::JIT::create();
-            if (!expected_jit)
-                return expected_jit.takeError();
-
-            jit = std::move(expected_jit.get());
-            return llvm::Error::success();
-        }
-
-        void reset_module() {
+        void new_module() {
             context = std::make_unique<llvm::LLVMContext>();
             mod = std::make_unique<llvm::Module>("main", *context);
             mod->setDataLayout(jit->getDataLayout()); 
@@ -66,6 +55,8 @@ namespace gen {
             fn_pass_manager->add(llvm::createCFGSimplificationPass());
 
             fn_pass_manager->doInitialization();
+
+            named_values.clear();
         }
 
         class Generator: public Visitor {
@@ -76,7 +67,6 @@ namespace gen {
             llvm::Value* get_result() {
                 return result;
             }
-
 
             llvm::Function* get_fn(std::string name) {
                 if (llvm::Function* existing = mod->getFunction(name))
