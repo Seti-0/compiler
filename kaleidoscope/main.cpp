@@ -20,8 +20,14 @@
 #    pragma comment(linker, "/alternatename:__imp___std_init_once_begin_initialize=__imp_InitOnceBeginInitialize")
 #endif
 
+// TODO: Implement function and extern definitions.
+// (Currently the jit expects a symbol called main every time!)
+
+// TODO: Cleanup jit - it can just be a namespace, doesn't need to be a class.
+
+// TODO: Move jit stuff out of generation and into jit.
+
 int main() {
     printf("V1\n");
-    llvm::ExitOnError exit_on_err;
-    exit_on_err(gen::interactive());
+    llvm::ExitOnError()(gen::interactive());
 }
