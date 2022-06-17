@@ -22,7 +22,8 @@ bool debug = false;
 
 void init();
 bool has_next();
-std::unique_ptr<ast::Statement> input(std::string);
+std::unique_ptr<ast::Statement> current;
+void input(std::string);
 
 void interactive() {
     init();
@@ -64,9 +65,11 @@ namespace {
     std::unique_ptr<ast::Statement> parse_statement();
 }
 
-std::unique_ptr<ast::Statement> input(std::string promt) {
-    if (!has_next()) 
-        return nullptr;
+void input(std::string promt) {
+    if (!has_next())  {
+        current = nullptr;
+        return;
+    }
 
     if ((!tokens::has_current) || tokens::current::is_symbol('\n')) {
         printf("%s> ", promt.c_str());
@@ -75,12 +78,12 @@ std::unique_ptr<ast::Statement> input(std::string promt) {
 
     if (tokens::current::is_symbol(';')) {
         tokens::next();
-        return nullptr;
+        current = nullptr;
+        return;
     }
 
-    std::unique_ptr<ast::Statement> result;
     try {
-        result = parse_statement();
+        current = parse_statement();
     } catch (std::exception& e) {
         util::print_exception(e);
         printf("(Error Token: %s)\n", tokens::current::describe().c_str());
@@ -89,10 +92,8 @@ std::unique_ptr<ast::Statement> input(std::string promt) {
         while (tokens::has_next() && !tokens::current::is_symbol('\n'))
             tokens::next();
 
-        result = nullptr;
+        current = nullptr;
     }
-
-    return result;
 }
 
 namespace {
@@ -154,7 +155,7 @@ namespace {
     std::unique_ptr<ast::Fn> parse_top_level_expr() {
         try {
             auto E = parse_expr();
-            auto proto = std::make_unique<ast::Pro>("main", std::vector<std::string>());
+            auto proto = std::make_unique<ast::Pro>("_main", std::vector<std::string>());
             return std::make_unique<ast::Fn>(std::move(proto), std::move(E));
         } catch(...) {
             util::rethrow(__func__);

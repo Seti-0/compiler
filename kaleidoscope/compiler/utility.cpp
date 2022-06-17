@@ -3,7 +3,13 @@
 #include <stdexcept>
 #include <string>
 
+#include "llvm/Support/Error.h"
+
 namespace util {
+    void initial_throw(std::string name, std::string msg) {
+        throw std::runtime_error(name + ": " + msg);
+    }
+
     void rethrow(std::string name, std::string msg)
     {
         std::string text = name;

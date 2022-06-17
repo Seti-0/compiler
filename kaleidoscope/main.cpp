@@ -6,7 +6,7 @@
 #include <memory>
 #include <map>
 
-#include "compiler/generation.cpp"
+#include "compiler/jit.cpp"
 
 // As I understand it, there was an errant (unlisted) breaking change for visual c++ and a specific api.
 // This tells the linker that there is a new name for the two functions changed.
@@ -28,6 +28,6 @@
 // TODO: Move jit stuff out of generation and into jit.
 
 int main() {
-    printf("V1\n");
-    llvm::ExitOnError()(gen::interactive());
+    printf("V2\n");
+    llvm::ExitOnError()(jit::interactive());
 }
