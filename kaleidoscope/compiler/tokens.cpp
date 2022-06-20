@@ -114,7 +114,7 @@ int interactive() {
     printf("Spacing is ignored, usually.");
     printf(" (Newlines can be optionally returned, for the sake of interactive mode)\n");
     printf("Comments begin with a '#'.\n");
-    printf("Keywords: def, extern\n");
+    printf("Keywords: def, extern, if, then, for, in\n");
     printf("Otherwise it's just numbers, identifiers.\n");
     printf("Anything that is none of the above is an 'other token'\n");
     printf("\n");
@@ -158,7 +158,7 @@ namespace {
     void read_token();
 }
 
-// Moving the CurrentToken to the next single token.
+// Move tokens::current to the next single token.
 // Newlines are counted as SYMBOL tokens here.
 void next() {
     read_token();
@@ -167,12 +167,17 @@ void next() {
         printf("%s\n", current::describe().c_str());
 }
 
-// Move the CurrentToken to the next single token.
-// Skips any newlines.
-void next_solid() {
-    next();
+// Move past any newlines, if currently on a newline.
+// This has no effect if the current token is not a newline.
+void skip_newlines() {
     while (has_next() && current::is_symbol('\n'))
         next();
+}
+
+// Move to the next non-newline token.
+void next_solid() {
+    next();
+    skip_newlines();
 }
 
 namespace {
@@ -239,7 +244,14 @@ namespace {
                 chars::next();
             }
 
-            if (current::text == "def" || current::text == "extern") {
+            if (current::text == "def" 
+                || current::text == "extern"
+                || current::text == "if"
+                || current::text == "then"
+                || current::text == "else"
+                || current::text == "for"
+                || current::text == "in" 
+            ) {
                 current::kind = TOKEN_KEYWORD;
                 return;
             }

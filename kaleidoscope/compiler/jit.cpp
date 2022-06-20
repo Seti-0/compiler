@@ -17,7 +17,7 @@
 
 #include <memory>
 
-#include "generation.cpp"
+#include "gen.cpp"
 
 #ifdef _WIN32
 #define DLLEXPORT __declspec(dllexport)
@@ -46,12 +46,16 @@ namespace jit {
     llvm::Error interactive() {
         printf("IR Generation\n");
         printf("\n");
-        printf("Examples:\n");
+        printf("Simple Examples:\n");
         printf(" -> 2 + 2\t\t\t(anonymous fn and collasped const)\n");
-        printf(" -> extern sin(x); sin(1)\t\t(externally defined function)\n");
-        printf(" -> extern cos(x); def f(x)sin(x)*sin(x)+cos(x)*cos(x); f(235)\n");
+        printf(" -> extern sin(x); sin(1)\t(externally defined function)\n");
         printf(" -> def f()1; def f()2; f()\t(redefining functions)\n");
+        printf(" -> if 1 then 2 else 3\t(control flow)\n");
         printf("\n");
+        printf("More Complex Examples:\n");
+        printf(" -> extern cos(x); def f(x)sin(x)*sin(x)+cos(x)*cos(x); f(235)\n");
+        printf(" -> (for i=0, i<10 in printc(65+i)) + printc(10)\n");
+        printf(" -> def f(x) if x then 65 else 90; printc(f(0)) + printc(10)\n");
 
         expr::debug = true;
         gen::debug = true;

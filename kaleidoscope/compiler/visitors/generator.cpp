@@ -53,7 +53,7 @@ namespace gen {
 
                 context = std::make_unique<llvm::LLVMContext>();
                 mod = std::make_unique<llvm::Module>(name, *context);
-                mod->setDataLayout(*layout); 
+                if (layout) mod->setDataLayout(*layout); 
                 
                 builder = std::make_unique<llvm::IRBuilder<>>(*context);
                 
@@ -216,7 +216,7 @@ namespace gen {
                 named_values.clear();
                 for (auto& arg: fn->args())
                     named_values[std::string(arg.getName())] = &arg;
-                
+
                 try {
                     target.body->visit(*this);
                 } catch(...) {
@@ -227,8 +227,154 @@ namespace gen {
                 builder->CreateRet(value);
                 llvm::verifyFunction(*fn);
                 
-                fn_pass_manager->run(*fn);
+                //fn_pass_manager->run(*fn);
                 value = fn;
+            }
+
+            void visit_if(ast::If& target) {
+                try {
+                    target.cond->visit(*this);
+                } catch(...) {
+                    util::rethrow(__func__, "condition");
+                    return;
+                }
+                llvm::Value* zero = llvm::ConstantFP::get(*context, llvm::APFloat(0.));
+                llvm::Value* cond_value = builder->CreateFCmpONE(value, zero);
+
+                llvm::Function* fn = builder->GetInsertBlock()->getParent();
+                llvm::BasicBlock* then_block = llvm::BasicBlock::Create(*context, "then", fn);
+                llvm::BasicBlock* else_block = llvm::BasicBlock::Create(*context, "else");
+                llvm::BasicBlock* merge_block = llvm::BasicBlock::Create(*context, "merge");
+
+                builder->CreateCondBr(cond_value, then_block, else_block);
+
+                builder->SetInsertPoint(then_block);
+                try {
+                    target.a->visit(*this);
+                }
+                catch(...) {
+                    util::rethrow(__func__);
+                    return;
+                }
+                llvm::Value* then_value = value;
+                builder->CreateBr(merge_block);
+
+                // This could be the same as then_block, but it won't be
+                // if the then block it self created further blocks, such as if
+                // it is itself a (nested) if-expression.
+                llvm::BasicBlock* then_end_block = builder->GetInsertBlock();
+
+                // On a related note, only emit the "else" block now. This is so that
+                // it comes after any blocks emitted by "then".
+                fn->getBasicBlockList().push_back(else_block);
+
+                builder->SetInsertPoint(else_block);
+                if (target.b) {
+                    try {
+                        target.b->visit(*this);
+                    } catch(...) {
+                        util::rethrow(__func__);
+                        return;
+                    }
+                }
+                else {
+                    // If there is no else statement given, default to a value of 0 for it.
+                    value = llvm::ConstantFP::get(*context, llvm::APFloat(0.));
+                }
+                llvm::Value* else_value = value;
+                builder->CreateBr(merge_block);
+
+                llvm::BasicBlock* else_end_block = builder->GetInsertBlock();
+
+                // Emit the merge block.
+                fn->getBasicBlockList().push_back(merge_block);
+                builder->SetInsertPoint(merge_block);
+
+                llvm::PHINode* phi = builder->CreatePHI(llvm::Type::getDoubleTy(*context), 2, "iftmp");
+                phi->addIncoming(then_value, then_end_block);
+                phi->addIncoming(else_value, else_end_block);
+
+                value = phi;
+            }
+
+            void visit_for(ast::For& target) {
+                try {
+                    target.start->visit(*this);
+                }
+                catch(...) {
+                    util::rethrow(__func__, "start");
+                    return;
+                }
+                llvm::Value* start_value = value;
+
+                llvm::Function* fn = builder->GetInsertBlock()->getParent();
+                llvm::BasicBlock* start_block = builder->GetInsertBlock();
+                llvm::BasicBlock* first_loop_block = llvm::BasicBlock::Create(*context, "loop", fn);
+
+                builder->SetInsertPoint(start_block);
+                builder->CreateBr(first_loop_block); // Explicit fallthrough.
+
+                builder->SetInsertPoint(first_loop_block);
+                llvm::PHINode* phi = builder->CreatePHI(llvm::Type::getDoubleTy(*context), 2, target.var_name);
+                phi->addIncoming(start_value, start_block);
+
+                // If the loop variable shadows a variable from the enclosing scope, a backup
+                // of the enclosing reference is needed.
+                llvm::Value* backup = named_values[target.var_name];
+                named_values[target.var_name] = phi;
+
+                try {
+                    target.body->visit(*this);
+                } 
+                catch(...) {
+                    util::rethrow(__func__, "body");
+                    return;
+                }
+                // The value of the body is not used here.
+
+                llvm::Value* step;
+                if (target.inc) {
+                    try {
+                        target.inc->visit(*this);
+                    }
+                    catch(...) {
+                        util::rethrow(__func__, "step");
+                        return;
+                    }
+                    step = value;
+                }
+                else {
+                    step = llvm::ConstantFP::get(*context, llvm::APFloat(1.));
+                }
+                llvm::Value* next_value = builder->CreateFAdd(phi, step, "next");
+
+                try {
+                    target.end->visit(*this);
+                }
+                catch(...) {
+                    util::rethrow(__func__, "end");
+                    return;
+                }
+                // Note: "end" is a double 0 or 1 representing true/false, not the end
+                // of a range or something like that.
+                llvm::Value* end = value;
+                // Convert from 1/0 to true/false.
+                llvm::Value* zero = llvm::ConstantFP::get(*context, llvm::APFloat(0.));
+                llvm::Value* end_bool = builder->CreateFCmpONE(end, zero, "loop_ended");
+
+                llvm::BasicBlock* last_loop_block = builder->GetInsertBlock();
+                phi->addIncoming(next_value, last_loop_block);
+
+                llvm::BasicBlock* end_block = llvm::BasicBlock::Create(*context, "after", fn);
+                builder->CreateCondBr(end_bool, first_loop_block, end_block);   
+                builder->SetInsertPoint(end_block);           
+
+                if (backup)
+                    named_values[target.var_name] = backup;
+                else
+                    named_values.erase(target.var_name);
+
+                value = llvm::ConstantFP::getNullValue(llvm::Type::getDoubleTy(*context));
             }
         };
     }

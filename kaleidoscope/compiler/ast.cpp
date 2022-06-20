@@ -109,4 +109,36 @@ namespace ast {
             visitor.visit_fn(*this);
         }
     };
+
+    // If, as the conditional tenary: "cond ? a : b"
+    // cond, a, and b are expressions.
+    // b is optional, and will a nullptr if no else section is given.
+    class If : public Expr {
+    public:
+        const std::unique_ptr<Expr> cond, a, b;
+        If(std::unique_ptr<Expr> cond, std::unique_ptr<Expr> a, std::unique_ptr<Expr> b)
+            : cond(std::move(cond)), a(std::move(a)), b(std::move(b)) {}
+        
+        void visit(Visitor& visitor) override {
+            visitor.visit_if(*this);
+        }
+    };
+
+    // For loop. 
+    // Has a loop variable name, and start/end/increment expressions.
+    // Has a body expression as well.
+    // The increment expression is optional and will be no nullptr if not given.
+    class For : public Expr {
+    public:
+        std::string var_name;
+        std::unique_ptr<Expr> start, end, inc, body;
+        For(std::string var_name, std::unique_ptr<Expr> start,
+            std::unique_ptr<Expr> end, std::unique_ptr<Expr> inc, std::unique_ptr<Expr> body): 
+            var_name(var_name), start(std::move(start)), 
+            end(std::move(end)), inc(std::move(inc)), body(std::move(body)) {}
+        
+        void visit(Visitor& visitor) override {
+            visitor.visit_for(*this);
+        }
+    };
 }

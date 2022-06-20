@@ -67,4 +67,45 @@ public:
 
         result = "Fn(" + proto + ", " + body + ")";
     }
+
+    void visit_if(ast::If& target) override {
+        target.cond->visit(*this);
+        std::string cond = result;
+
+        target.a->visit(*this);
+        std::string a = result;
+
+        std::string text = "If(" + cond + ", " + a;
+
+        if (target.b) {
+            target.b->visit(*this);
+            text += ", " + result;
+        }
+
+        result = text;
+        result += ")";
+    }
+
+    void visit_for(ast::For& target) override {
+        std::string name = target.var_name;
+
+        target.start->visit(*this);
+        std::string start = result;
+
+        target.end->visit(*this);
+        std::string end = result;
+
+        std::string text = "For(" + name + ", " + start + ", " + end;
+
+        if (target.inc) {
+            target.inc->visit(*this);
+            std::string inc = result;
+            text += ", " + inc;
+        }
+
+        target.body->visit(*this);
+        std::string body = result;
+
+        result = text + ", " + body + ")";
+    }
 };

@@ -104,16 +104,18 @@ namespace {
         I'm using lowercase for raw tokens,
         and capitals for named subexpressions.
 
-        Num ::= number
-        Group ::= '(' Expr ')'
-        Call ::= Ref | FnCall
-        Primary ::= Num | Group | Call
-        Expr ::= primary (operator Primary)*
-
-        Proto ::= identifier '(' identifier* ')'
-        FnDef ::= 'def' Proto Expr
-        Extern ::= 'extern' Proto 
         Statement ::= FnDef | Extern | Expr
+        Extern ::= 'extern' Proto 
+        FnDef ::= 'def' Proto Expr
+        Proto ::= identifier '(' identifier* ')'
+
+        Expr ::= Primary (operator Primary)*
+        Primary ::= For | If | Call | Group | Num
+        For ::= 'for' identifier '=' Expr ',' Expr (',' Expr)? 'in' Expr
+        If ::= 'if' Expr 'then' Expr ('else' Expr)?
+        Call ::= Ref | FnCall
+        Group ::= '(' Expr ')'
+        Num ::= number
     */
 
     std::unique_ptr<ast::Fn> parse_top_level_expr();
@@ -238,9 +240,11 @@ namespace {
         }
     }
 
-    std::unique_ptr<ast::Expr> parse_number();
-    std::unique_ptr<ast::Expr> parse_group();
     std::unique_ptr<ast::Expr> parse_identifier();
+    std::unique_ptr<ast::Expr> parse_number();
+    std::unique_ptr<ast::Expr> parse_if();
+    std::unique_ptr<ast::Expr> parse_for();
+    std::unique_ptr<ast::Expr> parse_group();
 
     // Primary ::= Num | Group | Call
     std::unique_ptr<ast::Expr> parse_primary() {
@@ -249,6 +253,10 @@ namespace {
                 return parse_identifier();
             else if (tokens::current::is(tokens::TOKEN_NUMBER))
                 return parse_number();
+            else if (tokens::current::is_keyword("if"))
+                return parse_if();
+            else if (tokens::current::is_keyword("for"))
+                return parse_for();
             else if (tokens::current::is_symbol('('))
                 return parse_group();
         } catch(...) {
@@ -256,7 +264,7 @@ namespace {
             return nullptr;
         }
 
-        throw std::runtime_error("Expected identifier, number, or '(', found unknown token instead.");
+        throw std::runtime_error("Expected identifier, number, or '('.");
     } 
 
     // Binary operators and precedence
@@ -324,7 +332,116 @@ namespace {
         }
     }
 
+    // For ::= 'for' identifier '=' start:Expr ',' end:Expr (',' inc:Expr) 'in' body:Expr
+    std::unique_ptr<ast::Expr> parse_for() {
+        if (!tokens::current::is_keyword("for"))
+            throw std::runtime_error("Tried to parse a series of tokens which don't start with 'for', as a for-expression.");
+        tokens::next(); // Move on from the 'for' keyword.
+
+        if (!tokens::current::is(tokens::TOKEN_IDENTIFIER))
+            throw std::runtime_error("Expected variable name after 'for' keyword.");
+        std::string var_name = tokens::current::text;
+        tokens::next(); // Move on from the identifier.
+
+        if (!tokens::current::is_symbol('='))
+            throw std::runtime_error("Expected '=' after variable name for assignment in for loop.");
+        tokens::next(); // Move on from the '=' symbol.
+
+        std::unique_ptr<ast::Expr> start;
+        try {
+            start = parse_expr();
+        }
+        catch(...) {
+            util::rethrow(__func__, "start");
+            return nullptr;
+        }
+
+        if (!tokens::current::is_symbol(','))
+            throw std::runtime_error("Expected ',' after variable declaration in for-expression.");
+        tokens::next(); // Move on from the ',' symbol.
+
+        std::unique_ptr<ast::Expr> end;
+        try {
+            end = parse_expr();
+        } catch(...) {
+            util::rethrow(__func__, "end");
+            return nullptr;
+        }
+
+        std::unique_ptr<ast::Expr> inc = nullptr;
+        if (tokens::current::is_symbol(',')) {
+            tokens::next(); // Move on from the ',' symbol.
+            try {
+                inc = parse_expr();
+            } catch(...) {
+                util::rethrow(__func__, "inc");
+                return nullptr;
+            }
+        }
+
+        if (!tokens::current::is_keyword("in"))
+            throw std::runtime_error("Expected 'in' keyword before body in for-expression.");
+        tokens::next(); // Move on from the 'in' keyword.
+
+        std::unique_ptr<ast::Expr> body;
+        try {
+            body = parse_expr();
+        }
+        catch(...) {
+            util::rethrow(__func__, "body");
+            return nullptr;
+        }
+
+        return std::make_unique<ast::For>(var_name, std::move(start), 
+            std::move(end), std::move(inc), std::move(body));
+    }
+
+    // If ::= 'if' cond:Expr 'then' a:Expr ('else' b:Expr)?
+    std::unique_ptr<ast::Expr> parse_if() {
+        if (!tokens::current::is_keyword("if"))
+            throw std::runtime_error("Tried to parse a series of tokens which don't start with 'if', as an if-expression.");
+        tokens::next(); // Move on from the 'if' keyword.
+
+        std::unique_ptr<ast::Expr> condition;
+        try {  
+            condition = parse_expr();
+        }
+        catch(...) {
+            util::rethrow(__func__, "condition");
+            return nullptr;
+        }
+
+        if (!tokens::current::is_keyword("then"))
+            throw std::runtime_error("Expected 'then' keyword after 'if' and condition expression.");
+        tokens::next(); // Move on from the 'then' keyword.
+
+        std::unique_ptr<ast::Expr> a;
+        try {
+            a = parse_expr();
+        }
+        catch(...) {
+            util::rethrow(__func__, "then");
+            return nullptr;
+        }
+
+        std::unique_ptr<ast::Expr> b = nullptr;
+        if (tokens::current::is_keyword("else")) {
+            tokens::next(); // Move on from the 'else' keyword.
+            try {
+                b = parse_expr();
+            }
+            catch(...) {
+                util::rethrow(__func__, "else");
+                return nullptr;
+            }
+        }
+
+        return std::make_unique<ast::If>(std::move(condition), std::move(a), std::move(b));
+    }
+
     // Call ::= Ref | FnCall
+    // Ref ::= identifier
+    // FnCall ::= identifier '(' (expression (',' expression)*)? ')'
     std::unique_ptr<ast::Expr> parse_identifier() {
         if (!tokens::current::is(tokens::TOKEN_IDENTIFIER))
             throw std::runtime_error("Tried to parse token that was not an identifier, as an identifier.");
