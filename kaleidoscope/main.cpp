@@ -6,6 +6,7 @@
 #include <memory>
 #include <map>
 
+#include "compiler/ast.cpp"
 #include "compiler/jit.cpp"
 
 // As I understand it, there was an errant (unlisted) breaking change for visual c++ and a specific api.

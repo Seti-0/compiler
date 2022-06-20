@@ -79,7 +79,7 @@ namespace gen {
                 if (iterator == prototypes.end())
                     return nullptr;
                 
-                std::vector<std::string> args = iterator->second->Args;
+                std::vector<std::string> args = iterator->second->args;
 
                 std::vector<llvm::Type*> arg_types(args.size(), llvm::Type::getDoubleTy(*context));
                 llvm::Type* ret_type = llvm::Type::getDoubleTy(*context);
@@ -138,23 +138,23 @@ namespace gen {
             }
 
             void visit_num(ast::Num& target) override {
-                value = llvm::ConstantFP::get(*context, llvm::APFloat(target.Val));
+                value = llvm::ConstantFP::get(*context, llvm::APFloat(target.value));
             }
 
             void visit_var(ast::Var& target) override {
-                value = named_values[target.Name];
+                value = named_values[target.name];
                 if (!value)
-                    throw std::runtime_error("Unknown variable '" + target.Name + "'");
+                    throw std::runtime_error("Unknown variable '" + target.name + "'");
             }
 
             void visit_op(ast::Op& target) override {
                 llvm::Value* lhs;
                 llvm::Value* rhs;
                 try {
-                    target.LHS->visit(*this);
+                    target.lhs->visit(*this);
                     lhs = value;
 
-                    target.RHS->visit(*this);
+                    target.rhs->visit(*this);
                     rhs = value;
                 } catch (...) {
                     util::rethrow(__func__);
@@ -177,21 +177,21 @@ namespace gen {
             }
 
             void visit_call(ast::Call& target) override {
-                llvm::Function* fn = get_fn(target.Callee);
+                llvm::Function* fn = get_fn(target.callee);
                 if (!fn)
-                    throw std::runtime_error("Unknown function: '" + target.Callee + "'.");
+                    throw std::runtime_error("Unknown function: '" + target.callee + "'.");
                 
-                if (fn->arg_size() != target.Args.size()) {
+                if (fn->arg_size() != target.args.size()) {
                     std::string expected = std::to_string(fn->arg_size());
-                    std::string found = std::to_string(target.Args.size());
-                    std::string name = "'" + target.Callee + "'";
+                    std::string found = std::to_string(target.args.size());
+                    std::string name = "'" + target.callee + "'";
                     throw std::runtime_error(expected + " args expected for function " + name + ", found " + found + ".");
                 }
 
                 std::vector<llvm::Value*> args;
-                for (int i = 0; i < target.Args.size(); i++) {
+                for (int i = 0; i < target.args.size(); i++) {
                     try {
-                        target.Args[i]->visit(*this);
+                        target.args[i]->visit(*this);
                     } catch (...) {
                         util::rethrow(__func__);
                     }
@@ -202,13 +202,13 @@ namespace gen {
             }
 
             void visit_pro(ast::Pro& target) override {
-                prototypes[target.Name] = target.copy();
+                prototypes[target.name] = target.copy();
             }
 
             void visit_fn(ast::Fn& target) override {
-                init_module(target.proto->Name);
-                prototypes[target.proto->Name] = target.proto->copy();
-                llvm::Function* fn = get_fn(target.proto->Name);
+                init_module(target.proto->name);
+                prototypes[target.proto->name] = target.proto->copy();
+                llvm::Function* fn = get_fn(target.proto->name);
 
                 llvm::BasicBlock* entry_block = llvm::BasicBlock::Create(*context, "entry", fn);
                 builder->SetInsertPoint(entry_block);

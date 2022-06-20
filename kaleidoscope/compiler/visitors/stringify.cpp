@@ -13,20 +13,20 @@ public:
     }
 
     void visit_num(ast::Num& target) override {
-        result = "Num(" + std::to_string(target.Val) + ")";
+        result = "Num(" + std::to_string(target.value) + ")";
     }
 
     void visit_var(ast::Var& target) override {
-        result = "Var(" + target.Name + ")";
+        result = "Var(" + target.name + ")";
     }
 
     void visit_op(ast::Op& target) override {
         std::string symbol = std::string(1, target.op);
 
-        target.LHS->visit(*this);
+        target.lhs->visit(*this);
         std::string lhs = result;
 
-        target.RHS->visit(*this);
+        target.rhs->visit(*this);
         std::string rhs = result;
 
         std::string args = symbol + ", " + lhs + ", " + rhs;
@@ -35,27 +35,27 @@ public:
 
     void visit_call(ast::Call& target) override {
         std::string args = "(";
-        if (target.Args.size() > 0) {
-            target.Args[0]->visit(*this);
+        if (target.args.size() > 0) {
+            target.args[0]->visit(*this);
             args += result;
-            for (int i = 1; i < target.Args.size(); i++) {
-                target.Args[i]->visit(*this);
+            for (int i = 1; i < target.args.size(); i++) {
+                target.args[i]->visit(*this);
                 args += ", " + result;
             }
         }
         args += ")";
-        result = "Call(" + target.Callee + ", " + args + ")";
+        result = "Call(" + target.callee + ", " + args + ")";
     }
 
     void visit_pro(ast::Pro& target) override {
         std::string args = "(";
-        if (target.Args.size() > 0) {
-            args += target.Args[0];
-            for (int i = 1; i < target.Args.size(); i++)   
-                args += ", "+ target.Args[i];
+        if (target.args.size() > 0) {
+            args += target.args[0];
+            for (int i = 1; i < target.args.size(); i++)   
+                args += ", "+ target.args[i];
         }
         args += ")";
-        result = "Pro(" + target.Name + ", " + args + ")";
+        result = "Pro(" + target.name + ", " + args + ")";
     }
 
     void visit_fn(ast::Fn& target) override {

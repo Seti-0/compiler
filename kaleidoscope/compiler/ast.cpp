@@ -26,8 +26,8 @@ namespace ast {
     // Number.
     class Num : public Expr {
     public:
-        const double Val;
-        Num(double val): Val(val) {}
+        const double value;
+        Num(double val): value(val) {}
 
         void visit(Visitor& visitor) override {
             visitor.visit_num(*this);
@@ -37,8 +37,8 @@ namespace ast {
     // Variable reference.
     class Var : public Expr {
     public:
-        const std::string Name;
-        Var(std::string name): Name(name) {}
+        const std::string name;
+        Var(std::string name): name(name) {}
 
         void visit(Visitor& visitor) override {
             visitor.visit_var(*this);
@@ -50,9 +50,9 @@ namespace ast {
     class Op : public Expr {
     public:
         const char op;
-        const std::unique_ptr<Expr> LHS, RHS;
+        const std::unique_ptr<Expr> lhs, rhs;
         Op(char op, std::unique_ptr<Expr> lhs, std::unique_ptr<Expr> rhs):
-            op(op), LHS(std::move(lhs)), RHS(std::move(rhs)) {}
+            op(op), lhs(std::move(lhs)), rhs(std::move(rhs)) {}
         
         void visit(Visitor& visitor) override {
             visitor.visit_op(*this);
@@ -62,10 +62,10 @@ namespace ast {
     // Function call.
     class Call : public Expr {
     public:
-        const std::string Callee;
-        const std::vector<std::unique_ptr<Expr>> Args;
+        const std::string callee;
+        const std::vector<std::unique_ptr<Expr>> args;
         Call(std::string callee, std::vector<std::unique_ptr<Expr>> args):
-            Callee(callee), Args(std::move(args)) {}
+            callee(callee), args(std::move(args)) {}
         
         void visit(Visitor& visitor) override {
             visitor.visit_call(*this);
@@ -76,20 +76,20 @@ namespace ast {
     // 'extern' and 'def' (function declaration) blocks.
     class Pro : public Statement {
     public:
-        const std::string Name;
-        const std::vector<std::string> Args;
+        const std::string name;
+        const std::vector<std::string> args;
         Pro(std::string name, std::vector<std::string> args):
-            Name(name), Args(args) {}
+            name(name), args(args) {}
         
         void visit(Visitor& visitor) override {
             visitor.visit_pro(*this);
         }
 
         std::unique_ptr<Pro> copy() {
-            std::string new_name = Name;
+            std::string new_name = name;
 
             std::vector<std::string> new_args;
-            for (std::string item: Args)
+            for (std::string item: args)
                 new_args.push_back(item);
             
             return std::make_unique<Pro>(new_name, new_args);
