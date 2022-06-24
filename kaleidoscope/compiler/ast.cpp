@@ -74,12 +74,16 @@ namespace ast {
 
     // Prototype. Used as a signature for
     // 'extern' and 'def' (function declaration) blocks.
+    // Also used for operator definitions, in which case the name will take the form "unary+"
+    // for a unary '+' operator, for example.
     class Pro : public Statement {
     public:
         const std::string name;
         const std::vector<std::string> args;
-        Pro(std::string name, std::vector<std::string> args):
-            name(name), args(args) {}
+        const double precedence;
+
+        Pro(std::string name, std::vector<std::string> args, double precedence):
+            name(name), args(args), precedence(precedence) {}
         
         void visit(Visitor& visitor) override {
             visitor.visit_pro(*this);
@@ -92,7 +96,23 @@ namespace ast {
             for (std::string item: args)
                 new_args.push_back(item);
             
-            return std::make_unique<Pro>(new_name, new_args);
+            return std::make_unique<Pro>(new_name, new_args, precedence);
+        }
+
+        bool is_operator() {
+            return !isalpha(name[name.size() - 1]);
+        }
+
+        bool is_unary() {
+            return is_operator() && args.size() == 1;
+        }
+
+        bool is_binary() {
+            return is_operator() && args.size() == 2;
+        }
+
+        char get_symbol() {
+            return name[name.size() - 1];
         }
     };
 

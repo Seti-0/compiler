@@ -5,7 +5,7 @@
 
 #include "../visitor.h"
 #include "../ast.cpp"
-#include "../utility.cpp"
+#include "../util.cpp"
 
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/IRBuilder.h"

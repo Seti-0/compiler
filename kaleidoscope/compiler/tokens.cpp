@@ -6,6 +6,8 @@
 #include <memory>
 #include <map>
 
+#include "llvm/Support/Error.h"
+
 namespace tokens {
 
 // If this is true, a description of each
@@ -42,7 +44,7 @@ namespace current {
     // of the last token that made use of them)    
     std::string text;
     double num;
-    double symbol;
+    char symbol;
 
     bool is(TokenKind target) {
         return kind == target;
@@ -106,8 +108,7 @@ void next();
     EXAMPLES & TESTS
 */
 
-int interactive() {
-
+llvm::Error interactive() {
     std::cout << "Hello World" << std::endl;
 
     printf("\n");
@@ -122,7 +123,8 @@ int interactive() {
     debug = true;
     while (true)
         next();
-
+    
+    return llvm::Error::success();
 }
 
 // Following the Kaleidoscope tutorial into to LLVM
@@ -244,13 +246,10 @@ namespace {
                 chars::next();
             }
 
-            if (current::text == "def" 
-                || current::text == "extern"
-                || current::text == "if"
-                || current::text == "then"
-                || current::text == "else"
-                || current::text == "for"
-                || current::text == "in" 
+            if (current::text == "def"  || current::text == "extern"
+                || current::text == "if" || current::text == "then" || current::text == "else"
+                || current::text == "for" || current::text == "in" 
+                || current::text == "unary" || current::text == "binary"
             ) {
                 current::kind = TOKEN_KEYWORD;
                 return;

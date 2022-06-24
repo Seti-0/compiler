@@ -56,6 +56,7 @@ namespace jit {
         printf(" -> extern cos(x); def f(x)sin(x)*sin(x)+cos(x)*cos(x); f(235)\n");
         printf(" -> (for i=0, i<10 in printc(65+i)) + printc(10)\n");
         printf(" -> def f(x) if x then 65 else 90; printc(f(0)) + printc(10)\n");
+        printf("\n");
 
         expr::debug = true;
         gen::debug = true;

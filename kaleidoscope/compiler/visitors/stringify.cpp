@@ -55,7 +55,8 @@ public:
                 args += ", "+ target.args[i];
         }
         args += ")";
-        result = "Pro(" + target.name + ", " + args + ")";
+        std::string prec = std::to_string(target.precedence);
+        result = "Pro(" + target.name + ", " + args +  + ", " + prec + ")";
     }
 
     void visit_fn(ast::Fn& target) override {

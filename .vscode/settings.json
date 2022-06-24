@@ -81,7 +81,8 @@
         "xlocmon": "cpp",
         "xloctime": "cpp",
         "*.def": "cpp",
-        "*.inc": "cpp"
+        "*.inc": "cpp",
+        "*.rh": "cpp"
     },
     "cmake.sourceDirectory": "${workspaceFolder}/kaleidoscope",
     "cmake.configureOnOpen": false
