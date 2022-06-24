@@ -147,7 +147,11 @@ namespace gen {
                     throw std::runtime_error("Unknown variable '" + target.name + "'");
             }
 
-            void visit_op(ast::Op& target) override {
+            void visit_un(ast::Un& target) override {
+                throw std::runtime_error("NOT IMPLEMENTED");
+            }
+
+            void visit_bin(ast::Bin& target) override {
                 llvm::Value* lhs;
                 llvm::Value* rhs;
                 try {

@@ -3,7 +3,8 @@
 namespace ast {
     class Num;
     class Var;
-    class Op;
+    class Un;
+    class Bin;
     class Call;
     class Pro;
     class Fn;
@@ -17,7 +18,9 @@ public:
 
     virtual void visit_var(ast::Var&) = 0;
 
-    virtual void visit_op(ast::Op&) = 0;
+    virtual void visit_un(ast::Un&) = 0;
+
+    virtual void visit_bin(ast::Bin&) = 0;
 
     virtual void visit_call(ast::Call&) = 0;
 

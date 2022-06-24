@@ -20,7 +20,16 @@ public:
         result = "Var(" + target.name + ")";
     }
 
-    void visit_op(ast::Op& target) override {
+    void visit_un(ast::Un& target) {
+        std::string symbol = std::string(1, target.op);
+        target.rhs->visit(*this);
+        std::string rhs = result;
+
+        std::string args = symbol + ", " + rhs;
+        result = "Un(" + args + ")";
+    }
+
+    void visit_bin(ast::Bin& target) override {
         std::string symbol = std::string(1, target.op);
 
         target.lhs->visit(*this);

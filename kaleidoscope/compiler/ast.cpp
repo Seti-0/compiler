@@ -45,17 +45,30 @@ namespace ast {
         }
     };
 
+    // Unary Operator.
+    // One expression and an operator id.
+    class Un : public Expr {
+    public:
+        const char op;
+        const std::unique_ptr<Expr> rhs;
+        Un(char op, std::unique_ptr<Expr> rhs): op(op), rhs(std::move(rhs)) {}
+
+        void visit(Visitor& visitor) {
+            visitor.visit_un(*this);
+        }
+    };
+
     // Binary Operator. 
     // Two expressions and an operator id.
-    class Op : public Expr {
+    class Bin : public Expr {
     public:
         const char op;
         const std::unique_ptr<Expr> lhs, rhs;
-        Op(char op, std::unique_ptr<Expr> lhs, std::unique_ptr<Expr> rhs):
+        Bin(char op, std::unique_ptr<Expr> lhs, std::unique_ptr<Expr> rhs):
             op(op), lhs(std::move(lhs)), rhs(std::move(rhs)) {}
         
         void visit(Visitor& visitor) override {
-            visitor.visit_op(*this);
+            visitor.visit_bin(*this);
         }
     };
 

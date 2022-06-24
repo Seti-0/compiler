@@ -114,7 +114,8 @@ namespace {
         Proto ::= (identifier | ('unary' operator) | ('binary' operator number)) '(' identifier* ')' 
 
         Expr ::= Primary (operator Primary)*
-        Primary ::= For | If | Call | Group | Num
+        Primary ::= For | If | Call | Group | Num | Unary
+        Unary ::= operator Primary
         For ::= 'for' identifier '=' Expr ',' Expr (',' Expr)? 'in' Expr
         If ::= 'if' Expr 'then' Expr ('else' Expr)?
         Call ::= Ref | FnCall
@@ -278,16 +279,19 @@ namespace {
         }
     }
 
+    std::unique_ptr<ast::Expr> parse_unary();
     std::unique_ptr<ast::Expr> parse_identifier();
     std::unique_ptr<ast::Expr> parse_number();
     std::unique_ptr<ast::Expr> parse_if();
     std::unique_ptr<ast::Expr> parse_for();
     std::unique_ptr<ast::Expr> parse_group();
 
-    // Primary ::= Num | Group | Call
+    // Primary ::= Num | Group | Call | If | For | Unary
     std::unique_ptr<ast::Expr> parse_primary() {
         try {
-            if (tokens::current::is(tokens::TOKEN_IDENTIFIER))
+            if (tokens::current::is(tokens::TOKEN_SYMBOL))
+                return parse_unary();
+            else if (tokens::current::is(tokens::TOKEN_IDENTIFIER))
                 return parse_identifier();
             else if (tokens::current::is(tokens::TOKEN_NUMBER))
                 return parse_number();
@@ -304,6 +308,16 @@ namespace {
 
         throw std::runtime_error("Expected identifier, number, or '('.");
     } 
+
+    // Unary ::= operator Primary
+    std::unique_ptr<ast::Expr> parse_unary() {
+        if (!tokens::current::is(tokens::TOKEN_SYMBOL))
+            throw std::runtime_error("Expected operator at the beginning of unary expression.");
+        char op = tokens::current::symbol;
+        tokens::next(); // Move past the operator symbol.
+        std::unique_ptr<ast::Expr> rhs = parse_primary();
+        return std::make_unique<ast::Un>(op, std::move(rhs));
+    }
 
     // Binary operators and precedence
 
@@ -366,7 +380,7 @@ namespace {
             }
 
             // Merge LHS/RHS.
-            lhs = std::make_unique<ast::Op>(binary_op, std::move(lhs), std::move(rhs));
+            lhs = std::make_unique<ast::Bin>(binary_op, std::move(lhs), std::move(rhs));
         }
     }
 
