@@ -52,10 +52,15 @@ namespace jit {
         printf(" -> def f()1; def f()2; f()\t(redefining functions)\n");
         printf(" -> if 1 then 2 else 3\t(control flow)\n");
         printf("\n");
-        printf("More Complex Examples:\n");
+        printf("Extern and Printing:\n");
         printf(" -> extern cos(x); def f(x)sin(x)*sin(x)+cos(x)*cos(x); f(235)\n");
         printf(" -> (for i=0, i<10 in printc(65+i)) + printc(10)\n");
         printf(" -> def f(x) if x then 65 else 90; printc(f(0)) + printc(10)\n");
+        printf("\n");
+        printf("Operators:\n");
+        printf(" -> def binary:1(x y) 0\n");
+        printf(" -> def binary~10(a b) a*10 + b\n");
+        printf(" -> def unary!(n)if n < 2 then 1 else n*!(n-1)\n");
         printf("\n");
 
         expr::debug = true;

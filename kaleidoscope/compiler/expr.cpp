@@ -289,18 +289,18 @@ namespace {
     // Primary ::= Num | Group | Call | If | For | Unary
     std::unique_ptr<ast::Expr> parse_primary() {
         try {
-            if (tokens::current::is(tokens::TOKEN_SYMBOL))
-                return parse_unary();
-            else if (tokens::current::is(tokens::TOKEN_IDENTIFIER))
-                return parse_identifier();
-            else if (tokens::current::is(tokens::TOKEN_NUMBER))
-                return parse_number();
-            else if (tokens::current::is_keyword("if"))
+            if (tokens::current::is_keyword("if"))
                 return parse_if();
             else if (tokens::current::is_keyword("for"))
                 return parse_for();
             else if (tokens::current::is_symbol('('))
                 return parse_group();
+            else if (tokens::current::is(tokens::TOKEN_SYMBOL))
+                return parse_unary();
+            else if (tokens::current::is(tokens::TOKEN_IDENTIFIER))
+                return parse_identifier();
+            else if (tokens::current::is(tokens::TOKEN_NUMBER))
+                return parse_number();
         } catch(...) {
             util::rethrow(__func__);
             return nullptr;
@@ -327,8 +327,12 @@ namespace {
         if (!tokens::current::is(tokens::TOKEN_SYMBOL))
             return -1;
         
-        if (operator_precedence.count(tokens::current::symbol) == 0)
+        if (tokens::current::symbol == ';' || tokens::current::symbol == '\n'
+            || tokens::current::symbol == '(' || tokens::current::symbol == ',' || tokens::current::symbol == ')')
             return -1;
+
+        if (operator_precedence.count(tokens::current::symbol) == 0)
+            return 0;
 
         return operator_precedence[tokens::current::symbol];
     }

@@ -23,5 +23,5 @@
 
 int main() {
     printf("V2\n");
-    llvm::ExitOnError()(expr::interactive());
+    llvm::ExitOnError()(jit::interactive());
 }

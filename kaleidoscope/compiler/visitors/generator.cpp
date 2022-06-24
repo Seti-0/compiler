@@ -148,7 +148,25 @@ namespace gen {
             }
 
             void visit_un(ast::Un& target) override {
-                throw std::runtime_error("NOT IMPLEMENTED");
+                llvm::Value* rhs;
+                try {
+                    target.rhs->visit(*this);
+                    rhs = value;
+                }
+                catch(...) {
+                    util::rethrow(__func__);
+                    return;
+                }
+
+                std::string name = "unary" + std::string(1, target.op);
+                if (llvm::Function* fn = get_fn(name)) {
+                    std::vector<llvm::Value*> args {rhs};
+                    value = builder->CreateCall(fn, args, "calltmp");
+                }
+                else {
+                    std::string msg = "Unary operator not implemented: '" + std::string(1, target.op) + "'.";
+                    throw std::runtime_error(msg);
+                }
             }
 
             void visit_bin(ast::Bin& target) override {
@@ -175,8 +193,19 @@ namespace gen {
                         break;
                     }
                     default: 
-                        auto msg = "Operator not implemented: '" + std::string(1, target.op) + "'.";
-                        throw std::runtime_error(msg);
+                        for (auto iterator = prototypes.begin(); iterator != prototypes.end(); iterator++) {
+                            printf("FN: %s\n", iterator->first.c_str());
+                        }
+
+                        std::string fn_name = "binary" + std::string(1, target.op);
+                        if (llvm::Function* fn = get_fn(fn_name)) {
+                            std::vector<llvm::Value*> args {lhs, rhs};
+                            value = builder->CreateCall(fn, args, "calltmp");
+                        }
+                        else {
+                            std::string msg = "Binary operator not implemented: '" + std::string(1, target.op) + "'.";
+                            throw std::runtime_error(msg);
+                        }
                 }
             }
 
