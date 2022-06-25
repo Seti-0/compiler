@@ -193,10 +193,6 @@ namespace gen {
                         break;
                     }
                     default: 
-                        for (auto iterator = prototypes.begin(); iterator != prototypes.end(); iterator++) {
-                            printf("FN: %s\n", iterator->first.c_str());
-                        }
-
                         std::string fn_name = "binary" + std::string(1, target.op);
                         if (llvm::Function* fn = get_fn(fn_name)) {
                             std::vector<llvm::Value*> args {lhs, rhs};

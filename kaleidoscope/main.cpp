@@ -6,7 +6,6 @@
 #include <memory>
 #include <map>
 
-#include "compiler/ast.cpp"
 #include "compiler/jit.cpp"
 
 // As I understand it, there was an errant (unlisted) breaking change for visual c++ and a specific api.
@@ -20,6 +19,16 @@
 #    pragma comment(linker, "/alternatename:__imp___std_init_once_complete=__imp_InitOnceComplete")
 #    pragma comment(linker, "/alternatename:__imp___std_init_once_begin_initialize=__imp_InitOnceBeginInitialize")
 #endif
+
+// TODO: Create simple prelude!
+// TODO: Mandlebrot set demo.
+// TODO: Imports? An examples namespace for example? 
+// TODO: Fix tracing starting one level up from where it should.
+// TODO: Fix missing promt after input: "hello world!" (With error message)
+
+llvm::Expected<int> get() {
+    return 42;
+}
 
 int main() {
     printf("V2\n");

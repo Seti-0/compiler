@@ -1,5 +1,6 @@
 #pragma once
 
+#include "llvm/Support/Error.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ExecutionEngine/JITSymbol.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
@@ -13,7 +14,6 @@
 #include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
 #include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
 #include "llvm/IR/DataLayout.h"
-#include "llvm/Support/Error.h"
 
 #include <memory>
 
@@ -31,13 +31,11 @@ extern "C" DLLEXPORT double printc(double X) {
 }
 
 namespace jit {
-
     bool debug = false;
-
     llvm::Error init();
 
     // The double ptr will be null if there was no value returned from the evaluated item.
-    llvm::Expected<std::unique_ptr<double>> execute(std::unique_ptr<llvm::Module>, std::unique_ptr<llvm::LLVMContext>);
+    llvm::Expected<std::unique_ptr<double>> execute(std::string promt);
 
     namespace {
         std::shared_ptr<llvm::DataLayout> layout;
@@ -67,24 +65,13 @@ namespace jit {
         gen::debug = true;
         debug = true;
 
-        expr::init();
-        if (auto error = gen::init())
-            return error;
         if (auto error = init())
             return error;
 
         while(expr::has_next()) {
-            expr::input("jit");
-            if (!expr::current)
-                continue;
-            
-            gen::emit(*expr::current, layout);
-            if (!gen::has_current())
-                continue;
-
-            auto result = execute(std::move(gen::take_module()), std::move(gen::take_context()));
+            auto result = execute("jit");
             if (!result)
-                return result.takeError();
+                return std::move(result.takeError());
         }
 
         return llvm::Error::success();
@@ -111,16 +98,19 @@ namespace jit {
     }
 
     llvm::Error init() {
+        if (auto error = gen::init())
+            return std::move(error);
+
         auto control = llvm::orc::SelfExecutorProcessControl::Create();
         if (!control)
-            return control.takeError();
+            return std::move(control.takeError());
 
         session = std::make_unique<llvm::orc::ExecutionSession>(std::move(*control));
         llvm::orc::JITTargetMachineBuilder builder(session->getExecutorProcessControl().getTargetTriple());
 
         auto expected_layout = builder.getDefaultDataLayoutForTarget();
         if (!expected_layout)
-            return expected_layout.takeError();
+            return std::move(expected_layout.takeError());
         layout = std::make_unique<llvm::DataLayout>(expected_layout.get());
 
         mangle = std::make_unique<llvm::orc::MangleAndInterner>(*session, *layout);
@@ -143,6 +133,28 @@ namespace jit {
         }
 
         return llvm::Error::success();
+    }
+
+    llvm::Expected<std::unique_ptr<double>> execute(ast::Item&);
+    llvm::Expected<std::unique_ptr<double>> execute(std::string promt) {
+        expr::input(promt);
+        if (!expr::current)
+            return nullptr;
+        
+        return std::move(execute(*expr::current));
+    }
+
+    llvm::Expected<std::unique_ptr<double>> execute(std::unique_ptr<llvm::Module>, std::unique_ptr<llvm::LLVMContext>);
+    llvm::Expected<std::unique_ptr<double>> execute(ast::Item& expression) {
+        gen::emit(*expr::current, layout);
+        if (!gen::has_current())
+            return nullptr;
+
+        auto result = execute(std::move(gen::take_module()), std::move(gen::take_context()));
+        if (!result)
+            return std::move(result.takeError());
+        
+        return std::move(result);
     }
 
     llvm::Expected<std::unique_ptr<double>> execute(std::unique_ptr<llvm::Module> mod, std::unique_ptr<llvm::LLVMContext> context) {

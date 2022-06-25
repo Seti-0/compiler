@@ -25,8 +25,6 @@ namespace gen {
 
         expr::debug = true;
         debug = true;
-
-        expr::init();
         if (auto error = init())
             return error;
 
@@ -65,6 +63,8 @@ namespace gen {
     }
 
     llvm::Error init() {
+        expr::init();
+
         llvm::InitializeNativeTarget();
         llvm::InitializeNativeTargetAsmPrinter();
         llvm::InitializeNativeTargetAsmParser();
