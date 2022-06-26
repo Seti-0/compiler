@@ -10,6 +10,7 @@ namespace ast {
     class Fn;
     class If;
     class For;
+    class Import;
 }
 
 class Visitor {
@@ -31,4 +32,6 @@ public:
     virtual void visit_if(ast::If&) = 0;
 
     virtual void visit_for(ast::For&) = 0;
+
+    virtual void visit_import(ast::Import&) = 0;
 };

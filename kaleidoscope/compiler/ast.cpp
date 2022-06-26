@@ -7,11 +7,18 @@
 #include "visitor.h"
 
 namespace ast {
+    class Import;
+
     // Item (abstract) on the abstract syntax tree.
     // This can be a node or a leaf.
     class Item {
     public:
         virtual void visit(Visitor& visitor) = 0;
+        
+        // This is a bit silly, but I needed a dynamic cast.
+        virtual Import* as_import() {
+            return nullptr;
+        }
     };
 
     // Statement. (Abstract)
@@ -172,6 +179,20 @@ namespace ast {
         
         void visit(Visitor& visitor) override {
             visitor.visit_for(*this);
+        }
+    };
+
+    class Import : public Statement {
+    public:
+        std::string file;
+        Import(std::string file): file(file) {}
+
+        void visit(Visitor& visitor) override {
+            visitor.visit_import(*this);
+        }
+
+        Import* as_import() override {
+            return this;
         }
     };
 }

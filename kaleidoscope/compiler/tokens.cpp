@@ -5,6 +5,7 @@
 #include <vector>
 #include <memory>
 #include <map>
+#include <fstream>
 
 #include "llvm/Support/Error.h"
 
@@ -16,23 +17,27 @@ bool debug = false;
 
 enum TokenKind {
     // Keywords
-    // The value is stored in the TokenStr global.
-    TOKEN_KEYWORD,
+    // The value is stored at tokens::current:text.
+    KEYWORD,
 
     // Non-key words 
-    // The value is stored in the TokenStr global.
-    TOKEN_IDENTIFIER,
+    // The value is stored at tokens::current::text.
+    IDENTIFIER,
 
     // Literal number
-    // The value is stored in the TokenNum global.
-    TOKEN_NUMBER,
+    // The value is stored at tokens::current::num.
+    NUMBER,
 
-    // Symbols
-    // The value is stored in the TokenChar global.
-    TOKEN_SYMBOL,
+    // Key Symbols, such as "(" or ","
+    // The value is stored at tokens::current::symbol.
+    KEY_SYMBOL,
+
+    // Symbols that are not key, which are candidates for operators.
+    // The value is stored at tokens::current::symbol.
+    OPERATOR,
 
     // The End.
-    TOKEN_EOF,
+    END,
 };
 
 // Main entry point to tokenization.
@@ -51,11 +56,11 @@ namespace current {
     }
 
     bool is_keyword(std::string keyword) {
-        return kind == TOKEN_KEYWORD && text == keyword;
+        return kind == KEYWORD && text == keyword;
     }
 
-    bool is_symbol(char targetSymbol) {
-        return kind == TOKEN_SYMBOL && symbol == targetSymbol;
+    bool is_key_symbol(char targetSymbol) {
+        return kind == KEY_SYMBOL && symbol == targetSymbol;
     }
 
     std::string describe() {
@@ -63,26 +68,33 @@ namespace current {
         std::string desc;
     
         switch (kind) {
-            case TOKEN_KEYWORD:
+            case KEYWORD:
                 content = text;
                 desc = "keyword";
                 break;
-            case TOKEN_SYMBOL:
+            case KEY_SYMBOL:
                 if (symbol == '\n')
                     content = "\\n";
                 else
                     content = std::string(1, symbol);
-                desc = "symbol";
+                desc = "key symbol";
                 break;
-            case TOKEN_NUMBER:
+            case OPERATOR:
+                if (symbol == '\n')
+                    content = "\\n";
+                else
+                    content = std::string(1, symbol);
+                desc = "operator";
+                break;
+            case NUMBER:
                 content = std::to_string(num);
                 desc = "number";
                 break;
-            case TOKEN_IDENTIFIER:
+            case IDENTIFIER:
                 content = text;
                 desc = "identifier";
                 break;
-            case TOKEN_EOF:
+            case END:
                 content = "EOF";
                 desc = "end of line";
                 break;
@@ -97,10 +109,6 @@ namespace current {
 }
 
 bool has_current = false;
-
-bool has_next() {
-    return current::kind != TOKEN_EOF;
-}
 
 void next();
 
@@ -134,21 +142,92 @@ llvm::Error interactive() {
     TOKENIZATION
 */
 
-// Moving through characters.
-
 namespace {
     namespace chars {
         char current;
         bool has_current = false;
 
+        namespace {
+            // These are sources for characters. If both are null,
+            // the standard input is used instead.
+            std::unique_ptr<std::ifstream> file;
+            std::shared_ptr<std::string> source;
+
+            // Only used when the current source is a string.
+            int index;
+        }
+
+        void set_source_text(std::shared_ptr<std::string> new_source) {
+            source = std::move(new_source);
+            file = nullptr;
+            index = 0;
+        }
+
+        // Read from the given file, instead of the console input.
+        void set_source_file(std::string filename) {
+            file = std::make_unique<std::ifstream>(filename);
+            source = nullptr;
+        }
+
+        // Set the source back to the standard input.
+        void reset_source() {
+            source = nullptr;
+            file = nullptr;
+        }
+
+        bool has_next() {
+            if (source) {
+                int size = source->size();
+                return index < size;
+            }
+            else if (file) {
+                return file->is_open() && file->good() && !file->eof();
+            }
+            else {
+                return true;
+            }
+        }
+
         void next() {
-            int result = getchar();
-            has_current = result != EOF;
-            
-            if (has_current)
-                current = result;
+            if (source) {
+                int size = source->size();
+                // If a string has been given, read from it.
+                has_current = index >= 0 && index < size;
+                if (has_current) {
+                    current = (*source)[index];
+                    index++;
+                }
+                else {
+                    current = EOF;
+                }
+            }
+            else if (file) {
+                // If a file has been given, read from it.
+                int result = EOF;
+                if (file->is_open() && file->good()) 
+                    int result = file->get();
+                
+                if (!file->eof() && file->fail())
+                    printf("WARNING: FAILED TO READ FROM FILE.\n");
+
+                has_current = result != EOF;
+                if (has_current)
+                    current = result;                
+            }
+            else {
+                // Else, read from the standard input.
+                int result = getchar();
+                has_current = result != EOF;
+                
+                if (has_current)
+                    current = result;
+            }
         }
     }
+}
+
+bool has_next() {
+    return chars::has_next();
 }
 
 // Moving through tokens.
@@ -172,7 +251,7 @@ void next() {
 // Move past any newlines, if currently on a newline.
 // This has no effect if the current token is not a newline.
 void skip_newlines() {
-    while (has_next() && current::is_symbol('\n'))
+    while (has_next() && current::is_key_symbol('\n'))
         next();
 }
 
@@ -193,7 +272,7 @@ namespace {
 
         // If there still isn't one, then it means EOF has been reached.
         if (!chars::has_current) {
-            current::kind = TOKEN_EOF;
+            current::kind = END;
             return;
         }
 
@@ -203,8 +282,8 @@ namespace {
         // - However, after returning '\n', any more whitespace (including newlines!)
         // after that is ignored until the next non-newline token.
         
-        // Note: current::is_symbol refers to the latest token read, NOT the current character.
-        if (current::is_symbol('\n')) {
+        // Note: current::is_key_symbol refers to the latest token read, NOT the current character.
+        if (current::is_key_symbol('\n')) {
             while (chars::has_current && isspace(chars::current))
                 chars::next();
         }
@@ -226,14 +305,14 @@ namespace {
                 // between newlines.
 
                 current::symbol = '\n';
-                current::kind = TOKEN_SYMBOL;
+                current::kind = KEY_SYMBOL;
                 return;
             }
         }
 
         // After moving past whitespace, EOF may have been reached.
         if (!chars::has_current) {
-            current::kind = TOKEN_EOF;
+            current::kind = END;
             return;
         }
 
@@ -246,16 +325,16 @@ namespace {
                 chars::next();
             }
 
-            if (current::text == "def"  || current::text == "extern"
+            if (current::text == "def"  || current::text == "extern" || current::text == "import"
                 || current::text == "if" || current::text == "then" || current::text == "else"
                 || current::text == "for" || current::text == "in" 
                 || current::text == "unary" || current::text == "binary"
             ) {
-                current::kind = TOKEN_KEYWORD;
+                current::kind = KEYWORD;
                 return;
             }
 
-            current::kind = TOKEN_IDENTIFIER;
+            current::kind = IDENTIFIER;
             return;
         }
 
@@ -267,7 +346,7 @@ namespace {
             }
 
             current::num = strtod(NumStr.c_str(), 0);
-            current::kind = TOKEN_NUMBER;
+            current::kind = NUMBER;
             return;
         }
 
@@ -286,9 +365,15 @@ namespace {
 
         current::symbol = chars::current;
         chars::next(); // Move past the symbol.
-        current::kind = TOKEN_SYMBOL;
-        return;
 
+        if (current::symbol == '\n' || current::symbol == ';'
+            || current::symbol == '(' || current::symbol == ',' || current::symbol == ')'
+            || current::symbol == '=')
+            current::kind = KEY_SYMBOL;
+        else
+            current::kind = OPERATOR;
+        
+        return;
     }
 }
 

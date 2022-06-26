@@ -118,4 +118,8 @@ public:
 
         result = text + ", " + body + ")";
     }
+
+    void visit_import(ast::Import& target) override {
+        result = "Import(" + target.file + ")";
+    }
 };

@@ -405,6 +405,10 @@ namespace gen {
 
                 value = llvm::ConstantFP::getNullValue(llvm::Type::getDoubleTy(*context));
             }
+
+            void visit_import(ast::Import& target) {
+                throw std::runtime_error("Internal error: attempted to generate IR for an import statement!");
+            }
         };
     }
 }

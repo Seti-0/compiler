@@ -28,7 +28,7 @@ namespace gen {
         if (auto error = init())
             return error;
 
-        while(expr::has_next()) {
+        while(tokens::has_next()) {
             expr::input("generator");
             if (!expr::current)
                 continue;

@@ -44,7 +44,7 @@ llvm::Error interactive() {
     printf(" -> extern print(text, end); \t(external definition)\n");
     printf("\n");
 
-    while (has_next())
+    while (tokens::has_next())
         input("parsing");
 
     printf("Info: end of input reached, exiting.\n");
@@ -60,27 +60,22 @@ void init() {
     setup_precedence();
 }
 
-bool has_next() {
-    // I should probably take a closer look at this condition.
-    return tokens::has_next();
-}
-
 namespace {
     std::unique_ptr<ast::Statement> parse_statement();
 }
 
 void input(std::string promt) {
-    if (!has_next())  {
+    if (!tokens::has_next())  {
         current = nullptr;
         return;
     }
 
-    if ((!tokens::has_current) || tokens::current::is_symbol('\n')) {
-        printf("%s> ", promt.c_str());
+    if ((!tokens::has_current) || tokens::current::is_key_symbol('\n') || tokens::current::is(tokens::END)) {
+        if (promt.size() > 0) printf("%s> ", promt.c_str());
         tokens::next();
     }
 
-    if (tokens::current::is_symbol(';')) {
+    if (tokens::current::is_key_symbol(';')) {
         tokens::next();
         current = nullptr;
         return;
@@ -93,7 +88,7 @@ void input(std::string promt) {
         printf("(Error Token: %s)\n", tokens::current::describe().c_str());
 
         // After an error, skip past the rest of the line.
-        while (tokens::has_next() && !tokens::current::is_symbol('\n'))
+        while (tokens::has_next() && !tokens::current::is_key_symbol('\n'))
             tokens::next();
 
         current = nullptr;
@@ -108,7 +103,9 @@ namespace {
         I'm using lowercase for raw tokens,
         and capitals for named subexpressions.
 
-        Statement ::= Def | Extern | Expr | OpDef
+        Statement ::= Import | Def | Extern | Expr
+
+        Import ::= 'import' identifier
         Def ::= 'def' Proto Expr
         Extern ::= 'extern' Proto 
         Proto ::= (identifier | ('unary' operator) | ('binary' operator number)) '(' identifier* ')' 
@@ -124,18 +121,21 @@ namespace {
     */
 
     std::unique_ptr<ast::Fn> parse_top_level_expr();
+    std::unique_ptr<ast::Import> parse_import();
     std::unique_ptr<ast::Fn> parse_def();
     std::unique_ptr<ast::Pro> parse_extern();
 
     // Statement ::= FnDef | Extern | Expr
     std::unique_ptr<ast::Statement> parse_statement() {
-        if (tokens::current::kind == tokens::TOKEN_EOF || tokens::current::is_symbol(';')) 
+        if (tokens::current::kind == tokens::END || tokens::current::is_key_symbol(';')) 
             return nullptr;
 
         try {
             std::unique_ptr<ast::Statement> result = nullptr;
 
-            if (tokens::current::is_keyword("def")) 
+            if (tokens::current::is_keyword("import"))
+                result = parse_import();
+            else if (tokens::current::is_keyword("def")) 
                 result = parse_def();
             else if (tokens::current::is_keyword("extern"))
                 result = parse_extern();
@@ -154,6 +154,19 @@ namespace {
             util::rethrow(__func__);
             return nullptr;
         }
+    }
+
+    std::unique_ptr<ast::Import> parse_import() {
+        if (!tokens::current::is_keyword("import"))
+            throw std::runtime_error("Attempted to parse statement not beginning with 'import' as an import statement.");
+        tokens::next(); // Move past the 'import' keyword.
+
+        if (!tokens::current::is(tokens::IDENTIFIER))
+            throw std::runtime_error("Expected file identifier after 'import' keyword.");
+        std::string name = tokens::current::text;
+        tokens::next(); // Move past the file identifier.
+
+        return std::make_unique<ast::Import>(name);
     }
 
     std::unique_ptr<ast::Expr> parse_expr();
@@ -210,13 +223,13 @@ namespace {
         std::string name;
         double precedence = 0;
         int expected_arg_count = -1;
-        if (tokens::current::is(tokens::TOKEN_IDENTIFIER)) {
+        if (tokens::current::is(tokens::IDENTIFIER)) {
             name = tokens::current::text;
             tokens::next(); // Move past the identifier.
         }
         else if (tokens::current::is_keyword("unary")) {
             tokens::next(); // Move past the keyword 'unary'.
-            if (!tokens::current::is(tokens::TOKEN_SYMBOL))
+            if (!tokens::current::is(tokens::OPERATOR))
                 throw std::runtime_error("Expected operator symbol after keyword 'unary'.");
             name = "unary" + std::string(1, tokens::current::symbol);
             expected_arg_count = 1;
@@ -224,11 +237,11 @@ namespace {
         }
         else if (tokens::current::is_keyword("binary")) {
             tokens::next(); // Move past the keyword 'binary'.
-            if (!tokens::current::is(tokens::TOKEN_SYMBOL))
+            if (!tokens::current::is(tokens::OPERATOR))
                 throw std::runtime_error("Expected operator symbol after keyword 'binary'.");
             name = "binary" + std::string(1, tokens::current::symbol);
             tokens::next(); // Move past the operator symbol.
-            if (!tokens::current::is(tokens::TOKEN_NUMBER))
+            if (!tokens::current::is(tokens::NUMBER))
                 throw std::runtime_error("Expected precedence after keyword binary and operator symbol.");
             precedence = tokens::current::num;
             expected_arg_count = 2;
@@ -238,20 +251,20 @@ namespace {
             throw std::runtime_error("Expected identifier, 'binary', or 'unary' at the beginning of prototype.");
         }
 
-        if (!tokens::current::is_symbol('('))
+        if (!tokens::current::is_key_symbol('('))
             throw std::runtime_error("Expected '(' after prototype identification.");
         tokens::next(); // Move past '('
 
         std::vector<std::string> arg_names;
-        while (tokens::current::is(tokens::TOKEN_IDENTIFIER)) {
+        while (tokens::current::is(tokens::IDENTIFIER)) {
             arg_names.push_back(tokens::current::text);
             tokens::next();
         }
 
-        if (tokens::current::is_symbol(','))
+        if (tokens::current::is_key_symbol(','))
             printf("NOTE: Prototype arguments aren't comma delimited. E.g.: 'def f(a b)'\n");
 
-        if (!tokens::current::is_symbol(')'))
+        if (!tokens::current::is_key_symbol(')'))
             throw std::runtime_error("Expected ')' at the end of prototype arguments");
         tokens::next(); // Move past ')'
 
@@ -293,13 +306,13 @@ namespace {
                 return parse_if();
             else if (tokens::current::is_keyword("for"))
                 return parse_for();
-            else if (tokens::current::is_symbol('('))
+            else if (tokens::current::is_key_symbol('('))
                 return parse_group();
-            else if (tokens::current::is(tokens::TOKEN_SYMBOL))
+            else if (tokens::current::is(tokens::OPERATOR))
                 return parse_unary();
-            else if (tokens::current::is(tokens::TOKEN_IDENTIFIER))
+            else if (tokens::current::is(tokens::IDENTIFIER))
                 return parse_identifier();
-            else if (tokens::current::is(tokens::TOKEN_NUMBER))
+            else if (tokens::current::is(tokens::NUMBER))
                 return parse_number();
         } catch(...) {
             util::rethrow(__func__);
@@ -311,7 +324,7 @@ namespace {
 
     // Unary ::= operator Primary
     std::unique_ptr<ast::Expr> parse_unary() {
-        if (!tokens::current::is(tokens::TOKEN_SYMBOL))
+        if (!tokens::current::is(tokens::OPERATOR))
             throw std::runtime_error("Expected operator at the beginning of unary expression.");
         char op = tokens::current::symbol;
         tokens::next(); // Move past the operator symbol.
@@ -324,11 +337,7 @@ namespace {
     std::map<char, int> operator_precedence;
 
     int get_precedence() {
-        if (!tokens::current::is(tokens::TOKEN_SYMBOL))
-            return -1;
-        
-        if (tokens::current::symbol == ';' || tokens::current::symbol == '\n'
-            || tokens::current::symbol == '(' || tokens::current::symbol == ',' || tokens::current::symbol == ')')
+        if (!tokens::current::is(tokens::OPERATOR))
             return -1;
 
         if (operator_precedence.count(tokens::current::symbol) == 0)
@@ -394,12 +403,12 @@ namespace {
             throw std::runtime_error("Tried to parse a series of tokens which don't start with 'for', as a for-expression.");
         tokens::next(); // Move on from the 'for' keyword.
 
-        if (!tokens::current::is(tokens::TOKEN_IDENTIFIER))
+        if (!tokens::current::is(tokens::IDENTIFIER))
             throw std::runtime_error("Expected variable name after 'for' keyword.");
         std::string var_name = tokens::current::text;
         tokens::next(); // Move on from the identifier.
 
-        if (!tokens::current::is_symbol('='))
+        if (!tokens::current::is_key_symbol('='))
             throw std::runtime_error("Expected '=' after variable name for assignment in for loop.");
         tokens::next(); // Move on from the '=' symbol.
 
@@ -412,7 +421,7 @@ namespace {
             return nullptr;
         }
 
-        if (!tokens::current::is_symbol(','))
+        if (!tokens::current::is_key_symbol(','))
             throw std::runtime_error("Expected ',' after variable declaration in for-expression.");
         tokens::next(); // Move on from the ',' symbol.
 
@@ -425,7 +434,7 @@ namespace {
         }
 
         std::unique_ptr<ast::Expr> inc = nullptr;
-        if (tokens::current::is_symbol(',')) {
+        if (tokens::current::is_key_symbol(',')) {
             tokens::next(); // Move on from the ',' symbol.
             try {
                 inc = parse_expr();
@@ -499,29 +508,29 @@ namespace {
     // Ref ::= identifier
     // FnCall ::= identifier '(' (expression (',' expression)*)? ')'
     std::unique_ptr<ast::Expr> parse_identifier() {
-        if (!tokens::current::is(tokens::TOKEN_IDENTIFIER))
+        if (!tokens::current::is(tokens::IDENTIFIER))
             throw std::runtime_error("Tried to parse token that was not an identifier, as an identifier.");
         std::string name = tokens::current::text; // Use the current identifier token.
         tokens::next(); // Move on from the identifier.
 
-        if (!tokens::current::is_symbol('(')) // No open bracket means a basic reference.
+        if (!tokens::current::is_key_symbol('(')) // No open bracket means a basic reference.
             return std::make_unique<ast::Var>(name);
 
         // Else, a function call.
         tokens::next(); // Move on from '('
 
         std::vector<std::unique_ptr<ast::Expr>> args;
-        if (!tokens::current::is_symbol(')')) {
+        if (!tokens::current::is_key_symbol(')')) {
             while (true) {
                 if (auto arg = parse_expr())
                     args.push_back(std::move(arg));
                 else
                     throw std::runtime_error("Expected expression after '(' or ',' in function argument list.");
 
-                if (tokens::current::is_symbol(')'))
+                if (tokens::current::is_key_symbol(')'))
                     break;
 
-                if (!tokens::current::is_symbol(','))
+                if (!tokens::current::is_key_symbol(','))
                     throw std::runtime_error("Expected ')' or ',' after expression in function argument list.");
                 
                 tokens::next(); // Move on from ','
@@ -535,7 +544,7 @@ namespace {
 
     // Group ::= '(' Expr ')'
     std::unique_ptr<ast::Expr> parse_group() {
-        if (!tokens::current::is_symbol('('))
+        if (!tokens::current::is_key_symbol('('))
             throw std::runtime_error("Expected '(' at the beginning of an expression group.");
         tokens::next(); // Move on from '('
 
@@ -547,7 +556,7 @@ namespace {
             return nullptr;
         }
         
-        if (!tokens::current::is_symbol(')'))
+        if (!tokens::current::is_key_symbol(')'))
             throw std::runtime_error("Expected ')'");
 
         tokens::next(); // Move on from ')'
@@ -557,7 +566,7 @@ namespace {
 
     // Num ::= number
     std::unique_ptr<ast::Expr> parse_number() {
-        if (!tokens::current::is(tokens::TOKEN_NUMBER))
+        if (!tokens::current::is(tokens::NUMBER))
             throw std::runtime_error("Attempted to parse token that was not a number, as a number.");
 
         auto result = std::make_unique<ast::Num>(tokens::current::num);

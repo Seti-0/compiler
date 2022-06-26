@@ -23,14 +23,30 @@
 // TODO: Create simple prelude!
 // TODO: Mandlebrot set demo.
 // TODO: Imports? An examples namespace for example? 
+// TODO: Implement precedence.
 // TODO: Fix tracing starting one level up from where it should.
 // TODO: Fix missing promt after input: "hello world!" (With error message)
-
-llvm::Expected<int> get() {
-    return 42;
-}
+// TODO: Fix not skipping input after error on, for example, 'hello world'.
 
 int main() {
+
+    jit::debug = true;
+    jit::init();
+
+    tokens::debug = true;
+    expr::debug = true;
+    gen::debug = true;
+    builtins::init();
+    /*tokens::chars::set_source_text(builtins::map["pre"]);
+
+    while (tokens::has_next()) 
+        jit::execute("");
+    */
+
+    jit::cleanup();
+
+
     printf("V2\n");
-    llvm::ExitOnError()(jit::interactive());
+    jit::interactive();
+
 }

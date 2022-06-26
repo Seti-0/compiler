@@ -18,6 +18,7 @@
 #include <memory>
 
 #include "gen.cpp"
+#include "imports.cpp"
 
 #ifdef _WIN32
 #define DLLEXPORT __declspec(dllexport)
@@ -68,7 +69,7 @@ namespace jit {
         if (auto error = init())
             return error;
 
-        while(expr::has_next()) {
+        while(tokens::has_next()) {
             auto result = execute("jit");
             if (!result)
                 return std::move(result.takeError());
@@ -88,6 +89,10 @@ namespace jit {
         const std::string LIB_NAME = "<main>";
     }
 
+    void cleanup() {
+        session->getJITDylibByName(LIB_NAME)->clear();
+    }
+
     llvm::Expected<llvm::DataLayout&> get_layout() {
         if (!layout) {
             std::string msg = "No DataLayout found. Has jit::init() been called?\n";
@@ -98,6 +103,7 @@ namespace jit {
     }
 
     llvm::Error init() {
+        builtins::init();
         if (auto error = gen::init())
             return std::move(error);
 
@@ -144,9 +150,30 @@ namespace jit {
         return std::move(execute(*expr::current));
     }
 
+    void execute_builtin(std::string key) {
+        auto result = builtins::map.find(key);
+        if (result->second) {
+            tokens::chars::set_source_text(result->second);
+        }
+        else {
+            printf("Import not found: %s", key.c_str());
+            return;
+        }
+
+        while(tokens::has_next())
+            execute("");
+        
+        tokens::chars::reset_source();
+    }
+
     llvm::Expected<std::unique_ptr<double>> execute(std::unique_ptr<llvm::Module>, std::unique_ptr<llvm::LLVMContext>);
     llvm::Expected<std::unique_ptr<double>> execute(ast::Item& expression) {
-        gen::emit(*expr::current, layout);
+        if (ast::Import* import = expression.as_import()) {
+            execute_builtin(import->file);
+            return nullptr;
+        }
+
+        gen::emit(expression, layout);
         if (!gen::has_current())
             return nullptr;
 
