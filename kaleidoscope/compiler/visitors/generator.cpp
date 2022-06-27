@@ -6,6 +6,7 @@
 #include "../visitor.h"
 #include "../ast.cpp"
 #include "../util.cpp"
+#include "../expr.cpp"
 
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/IRBuilder.h"
@@ -237,6 +238,12 @@ namespace gen {
             void visit_fn(ast::Fn& target) override {
                 init_module(target.proto->name);
                 prototypes[target.proto->name] = target.proto->copy();
+
+                ast::Pro& proto = *target.proto;
+                if (proto.is_binary()) {
+                    expr::register_precedence(proto.get_symbol(), proto.precedence);
+                }
+
                 llvm::Function* fn = get_fn(target.proto->name);
 
                 llvm::BasicBlock* entry_block = llvm::BasicBlock::Create(*context, "entry", fn);
@@ -256,7 +263,7 @@ namespace gen {
                 builder->CreateRet(value);
                 llvm::verifyFunction(*fn);
                 
-                //fn_pass_manager->run(*fn);
+                fn_pass_manager->run(*fn);
                 value = fn;
             }
 

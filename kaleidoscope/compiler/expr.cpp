@@ -102,21 +102,24 @@ namespace {
         Summary.
         I'm using lowercase for raw tokens,
         and capitals for named subexpressions.
+        'SKIP' refers to places where newlines are allowed.
 
         Statement ::= Import | Def | Extern | Expr
 
         Import ::= 'import' identifier
-        Def ::= 'def' Proto Expr
+        Def ::= 'def' Proto SKIP Expr
         Extern ::= 'extern' Proto 
         Proto ::= (identifier | ('unary' operator) | ('binary' operator number)) '(' identifier* ')' 
 
-        Expr ::= Primary (operator Primary)*
+        Expr ::= Primary (operator SKIP Primary)*
         Primary ::= For | If | Call | Group | Num | Unary
-        Unary ::= operator Primary
-        For ::= 'for' identifier '=' Expr ',' Expr (',' Expr)? 'in' Expr
-        If ::= 'if' Expr 'then' Expr ('else' Expr)?
+        Unary ::= operator SKIP Primary
+        For ::= 'for' identifier '=' Expr ',' SKIP Expr (',' SKIP Expr)? SKIP 'in' SKIP Expr
+        If ::= 'if' Expr 'then' SKIP Expr SKIP ('else' SKIP Expr)?
         Call ::= Ref | FnCall
-        Group ::= '(' Expr ')'
+        Ref ::= identifier
+        FnCall ::= identifier '(' SKIP (Expr (',' SKIP Expr)*)? SKIP ')'
+        Group ::= '(' SKIP Expr SKIP ')'
         Num ::= number
     */
 
@@ -193,6 +196,11 @@ namespace {
 
         try {
             auto proto = parse_prototype();
+
+            // Allow function body definition on
+            // a new line.
+            tokens::skip_newlines();
+
             auto expression = parse_expr();
             std::unique_ptr<ast::Fn> fn = std::make_unique<ast::Fn>(std::move(proto), std::move(expression));
             return fn;
@@ -328,6 +336,7 @@ namespace {
             throw std::runtime_error("Expected operator at the beginning of unary expression.");
         char op = tokens::current::symbol;
         tokens::next(); // Move past the operator symbol.
+        tokens::skip_newlines(); // Expression definitely not finished.
         std::unique_ptr<ast::Expr> rhs = parse_primary();
         return std::make_unique<ast::Un>(op, std::move(rhs));
     }
@@ -335,6 +344,14 @@ namespace {
     // Binary operators and precedence
 
     std::map<char, int> operator_precedence;
+
+}
+
+void register_precedence(char op, int precedence) {
+    operator_precedence[op] = precedence;
+}
+
+namespace {
 
     int get_precedence() {
         if (!tokens::current::is(tokens::OPERATOR))
@@ -356,6 +373,8 @@ namespace {
         operator_precedence['<'] = 8;
         operator_precedence['>'] = 8;
         operator_precedence['='] = 7;
+        operator_precedence['&'] = 6;
+        operator_precedence['|'] = 5;
     }
 
     std::unique_ptr<ast::Expr> parse_rhs(
@@ -374,7 +393,9 @@ namespace {
             // Okay, we know this is a binary operator.
             // (get_precedence() already checked that this is a symbol, note)
             int binary_op = tokens::current::symbol;
+
             tokens::next(); // Move on past the operator.
+            tokens::skip_newlines(); // Expression is definitely not finished.
 
             // Parse the primary expression after the binary operator.
             std::unique_ptr<ast::Expr> rhs;
@@ -424,6 +445,7 @@ namespace {
         if (!tokens::current::is_key_symbol(','))
             throw std::runtime_error("Expected ',' after variable declaration in for-expression.");
         tokens::next(); // Move on from the ',' symbol.
+        tokens::skip_newlines(); // Allow each header segment to be on a separate line.
 
         std::unique_ptr<ast::Expr> end;
         try {
@@ -436,6 +458,7 @@ namespace {
         std::unique_ptr<ast::Expr> inc = nullptr;
         if (tokens::current::is_key_symbol(',')) {
             tokens::next(); // Move on from the ',' symbol.
+            tokens::skip_newlines(); // Allow each header segment to be on a separate line.
             try {
                 inc = parse_expr();
             } catch(...) {
@@ -444,9 +467,12 @@ namespace {
             }
         }
 
+        // I'm being free with newlines here.
+        tokens::skip_newlines();
         if (!tokens::current::is_keyword("in"))
             throw std::runtime_error("Expected 'in' keyword before body in for-expression.");
         tokens::next(); // Move on from the 'in' keyword.
+        tokens::skip_newlines();
 
         std::unique_ptr<ast::Expr> body;
         try {
@@ -476,9 +502,14 @@ namespace {
             return nullptr;
         }
 
+        // The then keyword can be placed on a line with the body, or with
+        // the header, or on its own, it doesn't matter.
+        tokens::skip_newlines();
         if (!tokens::current::is_keyword("then"))
             throw std::runtime_error("Expected 'then' keyword after 'if' and condition expression.");
         tokens::next(); // Move on from the 'then' keyword.
+        // The if statement body can be on the next line.
+        tokens::skip_newlines();
 
         std::unique_ptr<ast::Expr> a;
         try {
@@ -489,9 +520,15 @@ namespace {
             return nullptr;
         }
 
+        // This is arguable. It means that the else can
+        // be on the next line, but also that a short if-statement
+        // must be terminated by a ';'.
+        tokens::skip_newlines();
+
         std::unique_ptr<ast::Expr> b = nullptr;
         if (tokens::current::is_keyword("else")) {
             tokens::next(); // Move on from the 'else' keyword.
+            tokens::skip_newlines(); // The else statement body can be on a new line.
             try {
                 b = parse_expr();
             }
@@ -518,6 +555,7 @@ namespace {
 
         // Else, a function call.
         tokens::next(); // Move on from '('
+        tokens::skip_newlines(); // Definitely not finished here.
 
         std::vector<std::unique_ptr<ast::Expr>> args;
         if (!tokens::current::is_key_symbol(')')) {
@@ -526,6 +564,7 @@ namespace {
                     args.push_back(std::move(arg));
                 else
                     throw std::runtime_error("Expected expression after '(' or ',' in function argument list.");
+                tokens::skip_newlines(); // Definitely not finished.
 
                 if (tokens::current::is_key_symbol(')'))
                     break;
@@ -534,6 +573,7 @@ namespace {
                     throw std::runtime_error("Expected ')' or ',' after expression in function argument list.");
                 
                 tokens::next(); // Move on from ','
+                tokens::skip_newlines(); // Definitely not finished here.
             }
         }
 
@@ -547,6 +587,7 @@ namespace {
         if (!tokens::current::is_key_symbol('('))
             throw std::runtime_error("Expected '(' at the beginning of an expression group.");
         tokens::next(); // Move on from '('
+        tokens::skip_newlines(); // Definitely not finished here.
 
         std::unique_ptr<ast::Expr> expression;
         try {
@@ -555,7 +596,8 @@ namespace {
             util::rethrow(__func__);
             return nullptr;
         }
-        
+
+        tokens::skip_newlines(); // Not finished until that last bracket is added in.        
         if (!tokens::current::is_key_symbol(')'))
             throw std::runtime_error("Expected ')'");
 
