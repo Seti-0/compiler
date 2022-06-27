@@ -20,13 +20,13 @@
 #    pragma comment(linker, "/alternatename:__imp___std_init_once_begin_initialize=__imp_InitOnceBeginInitialize")
 #endif
 
-// TODO: Fix crash on non-existant import.
 // TODO: Mandlebrot set demo.
 // TODO: Fix tracing starting one level up from where it should.
 // TODO: Fix not skipping input after error on, for example, 'hello world'.
+// TODO: Consider trying to regroup grouped statements into one module rather than 
+// doing them one by one. The main issue there is find another way to redefine functions.
 
 int main() {
-
     //tokens::debug = true;
     expr::debug = true;
     //gen::debug = true;

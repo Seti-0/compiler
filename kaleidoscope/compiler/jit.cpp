@@ -151,12 +151,11 @@ namespace jit {
     }
 
     void execute_builtin(std::string key) {
-        auto result = builtins::map.find(key);
-        if (result->second) {
-            tokens::chars::set_source_text(result->second);
+        if (builtins::map.count(key) > 0) {
+            tokens::chars::set_source_text(builtins::map[key]);
         }
         else {
-            printf("Import not found: %s", key.c_str());
+            printf("Import not found: '%s'\n", key.c_str());
             return;
         }
 

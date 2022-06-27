@@ -83,6 +83,9 @@ void input(std::string promt) {
 
     try {
         current = parse_statement();
+
+        if (!(tokens::current::is_key_symbol(';') || tokens::current::is_key_symbol('\n') || tokens::current::is(tokens::END)))
+            throw std::runtime_error("End of statement expected.");
     } catch (std::exception& e) {
         util::print_exception(e);
         printf("(Error Token: %s)\n", tokens::current::describe().c_str());

@@ -14,21 +14,27 @@ namespace builtins {
             extern sin(y)
             extern printc(x)
 
-            def unary!(x) if x then 0 else 1
+            def unary!(x) 
+                if x then 0 
+                else 1
+            
             def unary-(x) 0-x
 
-            def binary|5(a b) if a then 1 else if b then 1 else 0
-            def binary&6(a b) if a then if b then 1
+            def binary|5(a b) 
+                if a then 1 
+                else if b then 1 
+                else 0
+            
+            def binary&6(a b) 
+            if a then if b then 1;
 
             def binary>8(a b) b < a
-
             def binary~7(a b) !(a < b | b > a)
-
             def binary:1(a b) 0
         )");
 
         map["mandle"] = std::make_shared<std::string>(R"(
-            
+
         )");
     }
 }
