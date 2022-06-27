@@ -416,6 +416,12 @@ namespace gen {
             void visit_import(ast::Import& target) {
                 throw std::runtime_error("Internal error: attempted to generate IR for an import statement!");
             }
+
+            void visit_block(ast::Block& target) {
+                for (const std::unique_ptr<ast::Statement>& statement: target.statements) {
+                    statement->visit(*this);
+                }
+            }
         };
     }
 }

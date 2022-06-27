@@ -122,4 +122,20 @@ public:
     void visit_import(ast::Import& target) override {
         result = "Import(" + target.file + ")";
     }
+
+    void visit_block(ast::Block& target) override {
+        std::string current = "Block(";
+
+        if (target.statements.size() > 0) {
+            target.statements[0]->visit(*this);
+            current += result;
+            for (int i = 1; i < target.statements.size(); i++) {
+                target.statements[1]->visit(*this);
+                current += ", " + result;
+            }
+        }
+        
+        current += ")";
+        result = current;
+    };
 };

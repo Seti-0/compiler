@@ -23,13 +23,18 @@
 // TODO: Mandlebrot set demo.
 // TODO: Fix tracing starting one level up from where it should.
 // TODO: Fix not skipping input after error on, for example, 'hello world'.
-// TODO: Consider trying to regroup grouped statements into one module rather than 
-// doing them one by one. The main issue there is find another way to redefine functions.
+// TODO: Continue towards making imports yield a single module.
+// TODO: Fix function redefinition deleting functions in the same module.
+// TODO: Msg.
+// TODO: Refactor tokens and expressions, maybe move from globals to args & returns.
+// TODO: Fix behaviour where 1;2;3 stringifies to 1;2;2
+// TODO: Fix imports not working.
+// TODO: Fix redefining associated symbols not working.
 
 int main() {
     //tokens::debug = true;
     expr::debug = true;
-    //gen::debug = true;
+    gen::debug = true;
     jit::debug = true;
     jit::init();
     builtins::init();

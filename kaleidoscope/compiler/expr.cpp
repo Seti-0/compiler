@@ -24,7 +24,7 @@ bool debug = false;
 
 void init();
 bool has_next();
-std::unique_ptr<ast::Statement> current;
+std::unique_ptr<ast::Block> current;
 void input(std::string);
 
 llvm::Error interactive() {
@@ -75,26 +75,48 @@ void input(std::string promt) {
         tokens::next();
     }
 
-    if (tokens::current::is_key_symbol(';')) {
-        tokens::next();
-        current = nullptr;
-        return;
+    std::vector<std::unique_ptr<ast::Statement>> vector;
+    std::unique_ptr<ast::Block> result_block = std::make_unique<ast::Block>(std::move(vector));
+
+    // The condition on this while should be the 'not' of the condition above, so that the
+    // promt is printed after this is reached.
+    while (tokens::has_current && !(tokens::current::is_key_symbol('\n') || tokens::current::is(tokens::END))) {
+        if (tokens::current::is_key_symbol(';')) {
+            tokens::next();
+            continue;
+        }
+
+        try {
+            result_block->statements.push_back(std::move(parse_statement()));
+
+            if (!(tokens::current::is_key_symbol(';') || tokens::current::is_key_symbol('\n') || tokens::current::is(tokens::END)))
+                throw std::runtime_error("End of statement expected.");
+        } catch (std::exception& e) {
+            util::print_exception(e);
+            printf("(Error Token: %s)\n", tokens::current::describe().c_str());
+
+            // After an error, skip past the rest of the line.
+            while (tokens::has_next() && !tokens::current::is_key_symbol('\n'))
+                tokens::next();
+
+            current = nullptr;
+        }
     }
 
-    try {
-        current = parse_statement();
-
-        if (!(tokens::current::is_key_symbol(';') || tokens::current::is_key_symbol('\n') || tokens::current::is(tokens::END)))
-            throw std::runtime_error("End of statement expected.");
-    } catch (std::exception& e) {
-        util::print_exception(e);
-        printf("(Error Token: %s)\n", tokens::current::describe().c_str());
-
-        // After an error, skip past the rest of the line.
-        while (tokens::has_next() && !tokens::current::is_key_symbol('\n'))
-            tokens::next();
-
+    if (result_block->statements.size() == 0)
         current = nullptr;
+    else
+        current = std::move(result_block);
+
+    if (debug) {
+        if (current) {
+            Stringifier stringifier;
+            current.get()->visit(stringifier);
+            printf("Expression: %s\n", stringifier.getResult().c_str());
+        }
+        else {
+            printf("Expression: nullptr\n");
+        }
     }
 }
 
@@ -148,13 +170,6 @@ namespace {
             else
                 result = parse_top_level_expr();
 
-            if (result) {
-                if (debug) {
-                    Stringifier stringifier;
-                    result.get()->visit(stringifier);
-                    printf("Expression: %s\n", stringifier.getResult().c_str());
-                }
-            }
             return result;
         } catch (...) {
             util::rethrow(__func__);

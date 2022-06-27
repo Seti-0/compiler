@@ -11,6 +11,7 @@ namespace ast {
     class If;
     class For;
     class Import;
+    class Block;
 }
 
 class Visitor {
@@ -34,4 +35,6 @@ public:
     virtual void visit_for(ast::For&) = 0;
 
     virtual void visit_import(ast::Import&) = 0;
+
+    virtual void visit_block(ast::Block&) = 0;
 };

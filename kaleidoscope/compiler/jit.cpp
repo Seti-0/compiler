@@ -84,6 +84,7 @@ namespace jit {
         std::unique_ptr<llvm::orc::RTDyldObjectLinkingLayer> obj_layer;
         std::unique_ptr<llvm::orc::IRCompileLayer> compile_layer;
 
+        std::map<std::string, std::unique_ptr<ast::Block>> blocks;
         std::map<std::string, llvm::orc::ResourceTrackerSP> module_trackers;
 
         const std::string LIB_NAME = "<main>";
@@ -141,13 +142,13 @@ namespace jit {
         return llvm::Error::success();
     }
 
-    llvm::Expected<std::unique_ptr<double>> execute(ast::Item&);
+    llvm::Expected<std::unique_ptr<double>> execute(std::unique_ptr<ast::Block>);
     llvm::Expected<std::unique_ptr<double>> execute(std::string promt) {
         expr::input(promt);
         if (!expr::current)
             return nullptr;
         
-        return std::move(execute(*expr::current));
+        return std::move(execute(std::move(expr::current)));
     }
 
     void execute_builtin(std::string key) {
@@ -165,55 +166,126 @@ namespace jit {
         tokens::chars::reset_source();
     }
 
-    llvm::Expected<std::unique_ptr<double>> execute(std::unique_ptr<llvm::Module>, std::unique_ptr<llvm::LLVMContext>);
-    llvm::Expected<std::unique_ptr<double>> execute(ast::Item& expression) {
-        if (ast::Import* import = expression.as_import()) {
+    llvm::Error compile(ast::Item& item, llvm::orc::ResourceTrackerSP tracker);
+    llvm::Expected<std::unique_ptr<double>> execute(std::unique_ptr<ast::Block> block) {
+        if (ast::Import* import = block->as_import()) {
             execute_builtin(import->file);
             return nullptr;
         }
 
-        gen::emit(expression, layout);
-        if (!gen::has_current())
-            return nullptr;
+        // Before executing, remove existing symbols that conflict. (They are being redefined)
+        // Unfortunately, I think this means removing the entire module with the conflict, and 
+        // recompiling the parts that don't conflict.
 
-        auto result = execute(std::move(gen::take_module()), std::move(gen::take_context()));
-        if (!result)
-            return std::move(result.takeError());
-        
+        // Deal with top level expressions (anonymous functions) separately.
+        std::vector<std::unique_ptr<ast::Fn>> anonymous_functions;
+        llvm::orc::ResourceTrackerSP new_tracker = session->getJITDylibByName(LIB_NAME)->createResourceTracker();
+        for (auto it = block->statements.begin(); it != block->statements.end();) {
+            ast::Fn* new_fn = (*it)->as_fn();
+            if (!new_fn) {
+                it++;
+                continue;
+            }
+
+            // Anonymous functions (representing top-level expressions) never clash since
+            // they are dealth with separately and never stored.
+            if (new_fn->proto->name == "_main") {
+                std::unique_ptr<ast::Fn> taken_fn = std::unique_ptr<ast::Fn>((ast::Fn*)(*it).release());
+                it = block->statements.erase(it);
+                anonymous_functions.push_back(std::move(taken_fn));
+                continue;
+            }
+
+            // For non-anonymous functions, remove any previously compiled code.
+            // Unfortunately this also removes any code originally associated with that function.
+            auto tracker_iter = module_trackers.find(new_fn->proto->name);
+            bool tracker_found = false;
+            if (tracker_iter != module_trackers.end()) {
+                tracker_iter->second->remove();
+                tracker_found = true;
+            }
+
+            // Now, to recompile the bits (if any) that were removed by association but
+            // aren't up for replacement. (We still might need them!)
+            auto block_iter = blocks.find(new_fn->proto->name);
+            if (block_iter != blocks.end()) {
+                std::unique_ptr<ast::Block> to_recompile = std::move(block_iter->second);
+                llvm::orc::ResourceTrackerSP replacement_tracker = session->getJITDylibByName(LIB_NAME)->createResourceTracker();
+                
+                // Before recompiling, remove the function to be replaced from the block.
+                // (Otherwise this will have been for nothing.)
+                for (auto it = block->statements.begin(); it != block->statements.end();) {
+                    if (ast::Fn* old_fn = (*it)->as_fn()) {
+                        if (old_fn->proto->name == new_fn->proto->name)
+                            it = block->statements.erase(it);
+                        else {
+                            // Also update the tracker ref. while we're at it.
+                            module_trackers[old_fn->proto->name] = replacement_tracker;
+                            it++;
+                        }
+                    }
+                }
+
+                if (auto error = compile(*to_recompile, replacement_tracker))
+                    return std::move(error);
+            }
+
+            // Finally, register a new tracker for the function that will be
+            // redefined in a moment.
+            module_trackers[new_fn->proto->name] = new_tracker;  
+
+            it++;
+        }
+
+        // Now that there are no conflicts, and the anonymous parts have been removed,
+        // and the tracker and block maps have been updated, execute the original block.
+        if (block->statements.size() > 0)
+            compile(*block, new_tracker);
+
+        // Next, run through the anonymous functions one by one. They need to be compiled 
+        // and executed and released.
+        std::unique_ptr<double> result = nullptr;
+        for (std::unique_ptr<ast::Fn>& fn: anonymous_functions) {
+            llvm::orc::ResourceTrackerSP temp_tracker = session->getJITDylibByName(LIB_NAME)->createResourceTracker();
+            if (auto error = compile(*fn, temp_tracker))
+                return std::move(error);
+
+            auto expected_symbol = session->lookup({&*session->getJITDylibByName(LIB_NAME)}, (*mangle)("_main"));
+            if (!expected_symbol) {
+                printf("WARNING: Unable to find symbol '_main' after compiling anonymous function.\n");
+                continue;
+            }
+
+            auto symbol = *expected_symbol;
+            double (*result_fn)() = (double (*)())(intptr_t)(symbol.getAddress());
+            result = std::make_unique<double>(result_fn());
+
+            if (debug) printf("Result: %f\n", *result);
+
+            if (auto error = temp_tracker->remove()) {
+                printf("gen::interactive: main cleanup -> ");
+                return std::move(error);
+            }
+        }
+
         return std::move(result);
     }
 
-    llvm::Expected<std::unique_ptr<double>> execute(std::unique_ptr<llvm::Module> mod, std::unique_ptr<llvm::LLVMContext> context) {
-        std::string name = mod->getName().str();
-        
-        llvm::orc::ResourceTrackerSP tracker = session->getJITDylibByName(LIB_NAME)->createResourceTracker();
-        llvm::orc::ThreadSafeModule thread_safe_mod(std::move(mod), std::move(context));
+    llvm::Error compile(ast::Item& item, llvm::orc::ResourceTrackerSP tracker) {
+        gen::emit(item, layout);
+        if (!gen::has_current()) {
+            // TODO: Maybe thing about adding a useful name here.
+            printf("WARNING: failed to regen IR for module.\n");
+            return llvm::Error::success();
+        }
 
-        auto value_iter = module_trackers.find(name);
-        if (value_iter != module_trackers.end())
-            value_iter->second->remove();
-        module_trackers[name] = tracker;
+        llvm::orc::ThreadSafeModule thread_safe_mod(std::move(gen::take_module()), std::move(gen::take_context()));
 
         if (auto error = compile_layer->add(tracker, std::move(thread_safe_mod))) {
-            printf("gen::interactive (add module) -> ");
-            return std::move(error);
-        }
-        
-        auto expected_symbol = session->lookup({&*session->getJITDylibByName(LIB_NAME)}, (*mangle)("_main"));
-        if (!expected_symbol)
-            return nullptr;
-
-        auto symbol = *expected_symbol;
-        double (*result_fn)() = (double (*)())(intptr_t)(symbol.getAddress());
-        double result = result_fn();
-
-        if (debug) printf("Result: %f\n", result);
-
-        if (auto error = tracker->remove()) {
-            printf("gen::interactive: main cleanup -> ");
+            printf("gen::interactive (replace existing module) -> ");
             return std::move(error);
         }
 
-        return std::make_unique<double>(result);
+        return llvm::Error::success();
     }
 }

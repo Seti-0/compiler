@@ -19,12 +19,34 @@ namespace ast {
         virtual Import* as_import() {
             return nullptr;
         }
+
+        virtual Block* as_block() {
+            return nullptr;
+        }
+
+        virtual Fn* as_fn() {
+            return nullptr;
+        }
     };
 
     // Statement. (Abstract)
     // A statement can be executed to cause sideeffects. 
     // It does not have a value.
     class Statement : public Item {};
+
+    class Block : public Item {
+    public:
+        std::vector<std::unique_ptr<Statement>> statements;
+        Block(std::vector<std::unique_ptr<Statement>> statements): statements(std::move(statements)) {}
+
+        virtual void visit(Visitor& visitor) {
+            visitor.visit_block(*this);
+        }
+
+        Block* as_block() override {
+            return this;
+        }
+    };
 
     // Expression. (Abstract)
     // An expression can be evaluated to yield a value.
@@ -147,6 +169,10 @@ namespace ast {
         
         void visit(Visitor& visitor) override {
             visitor.visit_fn(*this);
+        }
+
+        Fn* as_fn() override {
+            return this;
         }
     };
 
