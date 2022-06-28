@@ -130,7 +130,7 @@ public:
             target.statements[0]->visit(*this);
             current += result;
             for (int i = 1; i < target.statements.size(); i++) {
-                target.statements[1]->visit(*this);
+                target.statements[i]->visit(*this);
                 current += ", " + result;
             }
         }

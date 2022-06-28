@@ -22,14 +22,10 @@
 
 // TODO: Mandlebrot set demo.
 // TODO: Fix tracing starting one level up from where it should.
-// TODO: Fix not skipping input after error on, for example, 'hello world'.
-// TODO: Continue towards making imports yield a single module.
 // TODO: Fix function redefinition deleting functions in the same module.
 // TODO: Msg.
 // TODO: Refactor tokens and expressions, maybe move from globals to args & returns.
-// TODO: Fix behaviour where 1;2;3 stringifies to 1;2;2
-// TODO: Fix imports not working.
-// TODO: Fix redefining associated symbols not working.
+// TODO: Consider refactoring away from using iterators in jit::execute, it's quite error-prone the way it is.
 
 int main() {
     //tokens::debug = true;

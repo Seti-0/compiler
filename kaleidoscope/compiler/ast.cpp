@@ -27,6 +27,10 @@ namespace ast {
         virtual Fn* as_fn() {
             return nullptr;
         }
+
+        virtual Pro* as_pro() {
+            return nullptr;
+        }
     };
 
     // Statement. (Abstract)
@@ -129,6 +133,10 @@ namespace ast {
         
         void visit(Visitor& visitor) override {
             visitor.visit_pro(*this);
+        }
+
+        Pro* as_pro() override {
+            return this;
         }
 
         std::unique_ptr<Pro> copy() {

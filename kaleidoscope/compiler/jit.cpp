@@ -84,7 +84,7 @@ namespace jit {
         std::unique_ptr<llvm::orc::RTDyldObjectLinkingLayer> obj_layer;
         std::unique_ptr<llvm::orc::IRCompileLayer> compile_layer;
 
-        std::map<std::string, std::unique_ptr<ast::Block>> blocks;
+        std::map<std::string, std::shared_ptr<ast::Block>> associations;
         std::map<std::string, llvm::orc::ResourceTrackerSP> module_trackers;
 
         const std::string LIB_NAME = "<main>";
@@ -152,123 +152,166 @@ namespace jit {
     }
 
     void execute_builtin(std::string key) {
-        if (builtins::map.count(key) > 0) {
-            tokens::chars::set_source_text(builtins::map[key]);
-        }
-        else {
+        if (builtins::map.count(key) == 0) {
             printf("Import not found: '%s'\n", key.c_str());
             return;
         }
+
+        tokens::chars::set_source_text(builtins::map[key]);
+        expr::interactive_mode = false;
 
         while(tokens::has_next())
             execute("");
         
         tokens::chars::reset_source();
+        expr::interactive_mode = true;
     }
 
     llvm::Error compile(ast::Item& item, llvm::orc::ResourceTrackerSP tracker);
-    llvm::Expected<std::unique_ptr<double>> execute(std::unique_ptr<ast::Block> block) {
-        if (ast::Import* import = block->as_import()) {
-            execute_builtin(import->file);
+    llvm::Error compile_functions(std::vector<std::unique_ptr<ast::Fn>> functions);
+    llvm::Expected<std::unique_ptr<double>> execute_anonymous_fn(ast::Fn& fn);
+
+    llvm::Expected<std::unique_ptr<double>> execute(std::unique_ptr<ast::Block> unique_block) {
+        std::shared_ptr<ast::Block> block = std::shared_ptr<ast::Block>(unique_block.release());
+
+        std::unique_ptr<double> result = nullptr;
+
+        // Multiple (non-main) functions in a row are grouped into a single module for neatness.
+        // This does make things complicated when a function within a group is redefined, since
+        // I think only modules as a whole can be compiled/recompiled.
+        std::vector<std::unique_ptr<ast::Fn>> functions;
+
+        for (auto it = block->statements.begin(); it != block->statements.end(); it++) {
+            ast::Fn* fn = (*it)->as_fn();
+            if (fn && fn->proto->name != "_main") {
+                std::unique_ptr<ast::Fn> taken_fn = std::unique_ptr<ast::Fn>((ast::Fn*)(*it).release());
+                functions.push_back(std::move(taken_fn));
+            }
+            else if (ast::Pro* pro = (*it)->as_pro()) {
+                gen::emit(*pro, layout);
+                // No code needs to be compiled or executed here. 
+            }
+            else {
+                // These other actions do require that any pending functions have been
+                // compiled first.
+                if (functions.size() > 0) {
+                    compile_functions(std::move(functions));
+                    // Is std::move guaranteed to leave a valid (but cleared) vector,
+                    // or must a new one be initialized?
+                    functions = std::vector<std::unique_ptr<ast::Fn>>();
+                }
+
+                if (fn && fn->proto->name == "_main") {
+                    llvm::Expected<std::unique_ptr<double>> expected = execute_anonymous_fn(*fn);
+                    if (!expected) return expected.takeError();
+                    result = std::move(*expected);
+                }
+                else if (ast::Import* import = (*it)->as_import()) {
+                    execute_builtin(import->file);
+                }
+            }
+        }
+        // Compile any pending functions.
+        compile_functions(std::move(functions));
+
+        return std::move(result);
+    }
+
+    llvm::Error compile_functions(std::vector<std::unique_ptr<ast::Fn>> functions) {
+        if (functions.size() == 0)
+            return llvm::Error::success();
+
+        // Remove old compiled code, find all functions that were removed by association.
+
+        std::vector<std::shared_ptr<ast::Block>> to_compile;
+        for (std::unique_ptr<ast::Fn>& new_fn: functions) {
+            auto tracker_iter = module_trackers.find(new_fn->proto->name);
+            if (tracker_iter != module_trackers.end()) {
+                tracker_iter->second->remove();
+            }
+
+            auto assoc_iter = associations.find(new_fn->proto->name);
+            if (assoc_iter != associations.end()) {
+                to_compile.push_back(assoc_iter->second);
+            }
+        }
+
+        // Remove association between any new function and previous functions, the new
+        // functions will form a new associated group.
+
+        for (std::unique_ptr<ast::Fn>& new_fn: functions) {
+            for (std::shared_ptr<ast::Block>& block: to_compile) {
+                for (auto it = block->statements.begin(); it != block->statements.end();) {
+                    ast::Fn* fn = (*it)->as_fn();
+                    if (!fn) {
+                        std::error_code code(1, std::system_category());
+                        return llvm::make_error<llvm::StringError>(code, "Internal error: non-function statement stored in an associated function block.");
+                    }
+
+                    if (fn->proto->name == new_fn->proto->name) {
+                        it = block->statements.erase(it);
+                    }
+                    else {
+                        it++;
+                    }
+                }
+            }
+        }
+
+        // Create a block to compile for the new functions, and a tracker.
+        // (Is it possible to just cast A<B*> to A<C*> where B:C?)
+
+        std::vector<std::unique_ptr<ast::Statement>> statements;
+        std::shared_ptr<ast::Block> new_block = std::make_shared<ast::Block>(std::move(statements));
+        
+        for (std::unique_ptr<ast::Fn>& new_fn: functions) {
+            associations[new_fn->proto->name] = new_block;
+            new_block->statements.push_back(std::move(new_fn));
+        }
+        to_compile.push_back(new_block);
+
+        // Compile all blocks, update all trackers.
+
+        for (std::shared_ptr<ast::Block>& block: to_compile) {
+            if (block->statements.size() == 0)
+                continue;
+            
+            llvm::orc::ResourceTrackerSP tracker = session->getJITDylibByName(LIB_NAME)->createResourceTracker();
+            for (std::unique_ptr<ast::Statement>& statement: block->statements) {
+                if (ast::Fn* fn = statement->as_fn()) {
+                    module_trackers[fn->proto->name] = tracker;
+                }
+            }
+
+            compile(*block, tracker);
+        }
+
+        return llvm::Error::success();
+    }
+
+    llvm::Expected<std::unique_ptr<double>> execute_anonymous_fn(ast::Fn& fn) {
+        llvm::orc::ResourceTrackerSP temp_tracker = session->getJITDylibByName(LIB_NAME)->createResourceTracker();
+        if (auto error = compile(fn, temp_tracker))
+            return std::move(error);
+
+        auto expected_symbol = session->lookup({&*session->getJITDylibByName(LIB_NAME)}, (*mangle)("_main"));
+        if (!expected_symbol) {
+            printf("WARNING: Unable to find symbol '_main' after compiling anonymous function.\n");
             return nullptr;
         }
 
-        // Before executing, remove existing symbols that conflict. (They are being redefined)
-        // Unfortunately, I think this means removing the entire module with the conflict, and 
-        // recompiling the parts that don't conflict.
+        auto symbol = *expected_symbol;
+        double (*result_fn)() = (double (*)())(intptr_t)(symbol.getAddress());
+        std::unique_ptr<double> result = std::make_unique<double>(result_fn());
 
-        // Deal with top level expressions (anonymous functions) separately.
-        std::vector<std::unique_ptr<ast::Fn>> anonymous_functions;
-        llvm::orc::ResourceTrackerSP new_tracker = session->getJITDylibByName(LIB_NAME)->createResourceTracker();
-        for (auto it = block->statements.begin(); it != block->statements.end();) {
-            ast::Fn* new_fn = (*it)->as_fn();
-            if (!new_fn) {
-                it++;
-                continue;
-            }
+        if (debug) printf("Result: %f\n", *result);
 
-            // Anonymous functions (representing top-level expressions) never clash since
-            // they are dealth with separately and never stored.
-            if (new_fn->proto->name == "_main") {
-                std::unique_ptr<ast::Fn> taken_fn = std::unique_ptr<ast::Fn>((ast::Fn*)(*it).release());
-                it = block->statements.erase(it);
-                anonymous_functions.push_back(std::move(taken_fn));
-                continue;
-            }
-
-            // For non-anonymous functions, remove any previously compiled code.
-            // Unfortunately this also removes any code originally associated with that function.
-            auto tracker_iter = module_trackers.find(new_fn->proto->name);
-            bool tracker_found = false;
-            if (tracker_iter != module_trackers.end()) {
-                tracker_iter->second->remove();
-                tracker_found = true;
-            }
-
-            // Now, to recompile the bits (if any) that were removed by association but
-            // aren't up for replacement. (We still might need them!)
-            auto block_iter = blocks.find(new_fn->proto->name);
-            if (block_iter != blocks.end()) {
-                std::unique_ptr<ast::Block> to_recompile = std::move(block_iter->second);
-                llvm::orc::ResourceTrackerSP replacement_tracker = session->getJITDylibByName(LIB_NAME)->createResourceTracker();
-                
-                // Before recompiling, remove the function to be replaced from the block.
-                // (Otherwise this will have been for nothing.)
-                for (auto it = block->statements.begin(); it != block->statements.end();) {
-                    if (ast::Fn* old_fn = (*it)->as_fn()) {
-                        if (old_fn->proto->name == new_fn->proto->name)
-                            it = block->statements.erase(it);
-                        else {
-                            // Also update the tracker ref. while we're at it.
-                            module_trackers[old_fn->proto->name] = replacement_tracker;
-                            it++;
-                        }
-                    }
-                }
-
-                if (auto error = compile(*to_recompile, replacement_tracker))
-                    return std::move(error);
-            }
-
-            // Finally, register a new tracker for the function that will be
-            // redefined in a moment.
-            module_trackers[new_fn->proto->name] = new_tracker;  
-
-            it++;
+        if (auto error = temp_tracker->remove()) {
+            printf("gen::interactive: main cleanup -> ");
+            return std::move(error);
         }
 
-        // Now that there are no conflicts, and the anonymous parts have been removed,
-        // and the tracker and block maps have been updated, execute the original block.
-        if (block->statements.size() > 0)
-            compile(*block, new_tracker);
-
-        // Next, run through the anonymous functions one by one. They need to be compiled 
-        // and executed and released.
-        std::unique_ptr<double> result = nullptr;
-        for (std::unique_ptr<ast::Fn>& fn: anonymous_functions) {
-            llvm::orc::ResourceTrackerSP temp_tracker = session->getJITDylibByName(LIB_NAME)->createResourceTracker();
-            if (auto error = compile(*fn, temp_tracker))
-                return std::move(error);
-
-            auto expected_symbol = session->lookup({&*session->getJITDylibByName(LIB_NAME)}, (*mangle)("_main"));
-            if (!expected_symbol) {
-                printf("WARNING: Unable to find symbol '_main' after compiling anonymous function.\n");
-                continue;
-            }
-
-            auto symbol = *expected_symbol;
-            double (*result_fn)() = (double (*)())(intptr_t)(symbol.getAddress());
-            result = std::make_unique<double>(result_fn());
-
-            if (debug) printf("Result: %f\n", *result);
-
-            if (auto error = temp_tracker->remove()) {
-                printf("gen::interactive: main cleanup -> ");
-                return std::move(error);
-            }
-        }
-
-        return std::move(result);
+        return result;
     }
 
     llvm::Error compile(ast::Item& item, llvm::orc::ResourceTrackerSP tracker) {

@@ -18,6 +18,10 @@ namespace expr {
 
 bool debug = false;
 
+// If true, a new block is returned on each newline.
+// If false, a single block is returned for the entire input stream.
+bool interactive_mode = true;
+
 /*
     EXAMPLE
 */
@@ -70,7 +74,7 @@ void input(std::string promt) {
         return;
     }
 
-    if ((!tokens::has_current) || tokens::current::is_key_symbol('\n') || tokens::current::is(tokens::END)) {
+    if (interactive_mode && ((!tokens::has_current) || tokens::current::is_key_symbol('\n') || tokens::current::is(tokens::END))) {
         if (promt.size() > 0) printf("%s> ", promt.c_str());
         tokens::next();
     }
@@ -80,8 +84,8 @@ void input(std::string promt) {
 
     // The condition on this while should be the 'not' of the condition above, so that the
     // promt is printed after this is reached.
-    while (tokens::has_current && !(tokens::current::is_key_symbol('\n') || tokens::current::is(tokens::END))) {
-        if (tokens::current::is_key_symbol(';')) {
+    while (tokens::has_current && !((interactive_mode && tokens::current::is_key_symbol('\n')) || tokens::current::is(tokens::END))) {
+        if (tokens::current::is_key_symbol(';') || ((!interactive_mode) && tokens::current::is_key_symbol('\n'))) {
             tokens::next();
             continue;
         }
@@ -96,10 +100,11 @@ void input(std::string promt) {
             printf("(Error Token: %s)\n", tokens::current::describe().c_str());
 
             // After an error, skip past the rest of the line.
-            while (tokens::has_next() && !tokens::current::is_key_symbol('\n'))
+            while (tokens::has_next() && !(interactive_mode && tokens::current::is_key_symbol('\n')))
                 tokens::next();
 
             current = nullptr;
+            return;
         }
     }
 
