@@ -20,12 +20,14 @@
 #    pragma comment(linker, "/alternatename:__imp___std_init_once_begin_initialize=__imp_InitOnceBeginInitialize")
 #endif
 
-// TODO: Mandlebrot set demo.
 // TODO: Fix tracing starting one level up from where it should.
 // TODO: Fix function redefinition deleting functions in the same module.
 // TODO: Msg.
 // TODO: Refactor tokens and expressions, maybe move from globals to args & returns.
 // TODO: Consider refactoring away from using iterators in jit::execute, it's quite error-prone the way it is.
+// TODO: Fix output from extern functions when importing. Maybe regroup extern definition output?
+// TODO: Fix for loop end condition going one too far.
+// TODO: Fix two imports in the same block causing problems. e.g. import pre;import mandel
 
 int main() {
     //tokens::debug = true;
