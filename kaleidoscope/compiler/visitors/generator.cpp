@@ -20,6 +20,7 @@
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
+#include "llvm/Transforms/Utils.h"
 
 namespace gen {
     // This has to be kept between modules so that a call in
@@ -36,7 +37,7 @@ namespace gen {
 
             std::unique_ptr<llvm::IRBuilder<>> builder;
 
-            std::map<std::string, llvm::Value*> named_values;
+            std::map<std::string, llvm::AllocaInst*> named_values;
             llvm::Value* value;
 
             // I'm not sure what replaces the legacy pass manager used in the tutorial below.
@@ -59,6 +60,10 @@ namespace gen {
                 builder = std::make_unique<llvm::IRBuilder<>>(*context);
                 
                 fn_pass_manager = std::make_unique<llvm::legacy::FunctionPassManager>(mod.get());
+                // Use registers instead of the stack where possible. Basically, allows this generator
+                // to ignore registers mostly and just use the stack and let the optimizer figure out
+                // when to use one or the other.
+                fn_pass_manager->add(llvm::createPromoteMemoryToRegisterPass());
                 // Combine insustructions, without changing the control flow graph
                 fn_pass_manager->add(llvm::createInstructionCombiningPass());
                 // Reassociate expressions (re-order brackets) to help with later expression-related passes
@@ -94,6 +99,11 @@ namespace gen {
                     arg.setName(args[i++]);
                 
                 return fn;
+            }
+
+            llvm::AllocaInst* create_allocation(llvm::Function* fn, const std::string& var_name) {
+                llvm::IRBuilder<> temp_builder(&fn->getEntryBlock(), fn->getEntryBlock().begin());
+                return temp_builder.CreateAlloca(llvm::Type::getDoubleTy(*context), 0, var_name);
             }
         public:
             Generator(std::shared_ptr<llvm::DataLayout> layout): layout(layout) {}
@@ -143,9 +153,11 @@ namespace gen {
             }
 
             void visit_var(ast::Var& target) override {
-                value = named_values[target.name];
-                if (!value)
+                llvm::AllocaInst* ptr = named_values[target.name];
+                if (!ptr)
                     throw std::runtime_error("Unknown variable '" + target.name + "'");
+                
+                value = builder->CreateLoad(llvm::Type::getDoubleTy(*context), ptr, target.name);
             }
 
             void visit_un(ast::Un& target) override {
@@ -250,8 +262,11 @@ namespace gen {
                 builder->SetInsertPoint(entry_block);
 
                 named_values.clear();
-                for (auto& arg: fn->args())
-                    named_values[std::string(arg.getName())] = &arg;
+                for (llvm::Value& arg: fn->args()) {
+                    llvm::AllocaInst* ptr = create_allocation(fn, arg.getName().str());
+                    builder->CreateStore(&arg, ptr);
+                    named_values[std::string(arg.getName())] = ptr;
+                }
 
                 try {
                     target.body->visit(*this);
@@ -344,20 +359,21 @@ namespace gen {
                 llvm::Value* start_value = value;
 
                 llvm::Function* fn = builder->GetInsertBlock()->getParent();
-                llvm::BasicBlock* start_block = builder->GetInsertBlock();
+                llvm::AllocaInst* loop_var_ptr = create_allocation(fn, target.var_name);
+                builder->CreateStore(start_value, loop_var_ptr);
+
                 llvm::BasicBlock* first_loop_block = llvm::BasicBlock::Create(*context, "loop", fn);
 
-                builder->SetInsertPoint(start_block);
-                builder->CreateBr(first_loop_block); // Explicit fallthrough.
-
+                // Explicit fallthrough from the (current) end of the current block
+                // to the start of the newly created block.
+                builder->SetInsertPoint(builder->GetInsertBlock());
+                builder->CreateBr(first_loop_block);
                 builder->SetInsertPoint(first_loop_block);
-                llvm::PHINode* phi = builder->CreatePHI(llvm::Type::getDoubleTy(*context), 2, target.var_name);
-                phi->addIncoming(start_value, start_block);
 
                 // If the loop variable shadows a variable from the enclosing scope, a backup
                 // of the enclosing reference is needed.
-                llvm::Value* backup = named_values[target.var_name];
-                named_values[target.var_name] = phi;
+                llvm::AllocaInst* backup = named_values[target.var_name];
+                named_values[target.var_name] = loop_var_ptr;
 
                 try {
                     target.body->visit(*this);
@@ -382,7 +398,9 @@ namespace gen {
                 else {
                     step = llvm::ConstantFP::get(*context, llvm::APFloat(1.));
                 }
-                llvm::Value* next_value = builder->CreateFAdd(phi, step, "next");
+                llvm::Value* current_value = builder->CreateLoad(llvm::Type::getDoubleTy(*context), loop_var_ptr, target.var_name);
+                llvm::Value* next_value = builder->CreateFAdd(current_value, step, "next");
+                builder->CreateStore(next_value, loop_var_ptr);
 
                 try {
                     target.end->visit(*this);
@@ -397,9 +415,6 @@ namespace gen {
                 // Convert from 1/0 to true/false.
                 llvm::Value* zero = llvm::ConstantFP::get(*context, llvm::APFloat(0.));
                 llvm::Value* end_bool = builder->CreateFCmpONE(end, zero, "loop_ended");
-
-                llvm::BasicBlock* last_loop_block = builder->GetInsertBlock();
-                phi->addIncoming(next_value, last_loop_block);
 
                 llvm::BasicBlock* end_block = llvm::BasicBlock::Create(*context, "after", fn);
                 builder->CreateCondBr(end_bool, first_loop_block, end_block);   
@@ -424,11 +439,74 @@ namespace gen {
             }
 
             void visit_with(ast::With& target) override {
-                throw std::runtime_error("Not implemented!");
+                std::map<std::string, llvm::AllocaInst*> shadow_vars;
+
+                // Initialize the new variables, back up any shadowed ones from an enclosing scope.
+                
+                for (std::pair<std::string, std::unique_ptr<ast::Expr>>& assignment: target.assignments) {
+                    std::string name = assignment.first;
+                    llvm::AllocaInst* existing_ptr = named_values[name];
+                    if (existing_ptr)
+                        shadow_vars[name] = existing_ptr;
+                    
+                    llvm::AllocaInst* new_ptr = create_allocation(builder->GetInsertBlock()->getParent(), name);
+                    llvm::Value* initial_val;
+                    if (assignment.second) {
+                        try {
+                            assignment.second->visit(*this);
+                        }
+                        catch (...) {
+                            util::rethrow(__func__, "initial value for '" + name + "'");
+                            return;
+                        }
+                        initial_val = value;
+                    }
+                    else {
+                        initial_val = llvm::ConstantFP::getNullValue(llvm::Type::getDoubleTy(*context));
+                    }
+                    
+                    named_values[name] = new_ptr;
+                    builder->CreateStore(initial_val, new_ptr);
+                }
+
+                // Compile the body.
+
+                try {
+                    target.body->visit(*this);
+                }
+                catch (...) {
+                    util::rethrow(__func__, "body");
+                }
+                // (Leave the value as set by the body expression.)
+
+                // Remove variables going out of scope, restore any shadowed ones.
+
+                for (std::pair<std::string, std::unique_ptr<ast::Expr>>& assignment: target.assignments) {
+                    std::string name = assignment.first;
+                    llvm::AllocaInst* shadow = shadow_vars[name];
+                    if (shadow) {
+                        named_values[name] = shadow;
+                    }
+                    else {
+                        named_values.erase(name);
+                    }
+                }
             }
 
             void visit_assignment(ast::Assignment& target) override {
-                throw std::runtime_error("Not implemented!");
+                llvm::AllocaInst* stack_ptr = named_values[target.identifier];
+                if (!stack_ptr)
+                    throw std::runtime_error("Unrecognized variable name: '" + target.identifier + "'");
+                
+                try {
+                    target.visit(*this);
+                }
+                catch (...) {
+                    util::rethrow(__func__);
+                    return;
+                }
+
+                builder->CreateStore(value, stack_ptr);
             }
         };
     }

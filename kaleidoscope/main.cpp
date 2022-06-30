@@ -37,7 +37,7 @@ int main() {
     builtins::init();
 
     printf("V3\n");
-    expr::interactive();
+    jit::interactive();
     
     jit::cleanup();
 }
