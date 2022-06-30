@@ -12,6 +12,8 @@ namespace ast {
     class For;
     class Import;
     class Block;
+    class Assignment;
+    class With;
 }
 
 class Visitor {
@@ -37,4 +39,8 @@ public:
     virtual void visit_import(ast::Import&) = 0;
 
     virtual void visit_block(ast::Block&) = 0;
+
+    virtual void visit_assignment(ast::Assignment&) = 0;
+
+    virtual void visit_with(ast::With&) = 0;
 };

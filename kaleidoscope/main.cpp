@@ -21,7 +21,6 @@
 #endif
 
 // TODO: Fix tracing starting one level up from where it should.
-// TODO: Fix function redefinition deleting functions in the same module.
 // TODO: Msg.
 // TODO: Refactor tokens and expressions, maybe move from globals to args & returns.
 // TODO: Consider refactoring away from using iterators in jit::execute, it's quite error-prone the way it is.
@@ -38,7 +37,7 @@ int main() {
     builtins::init();
 
     printf("V3\n");
-    jit::interactive();
+    expr::interactive();
     
     jit::cleanup();
 }

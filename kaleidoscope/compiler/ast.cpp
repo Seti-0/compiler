@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <map>
+#include <utility>
 
 #include "visitor.h"
 
@@ -227,6 +229,32 @@ namespace ast {
 
         Import* as_import() override {
             return this;
+        }
+    };
+
+    class Assignment: public Expr {
+    public:
+        std::string identifier;
+        std::unique_ptr<ast::Expr> value;
+        Assignment(std::string identifier, std::unique_ptr<ast::Expr> val):
+            identifier(identifier), value(std::move(val)) {}
+        
+        void visit(Visitor& visitor) override {
+            visitor.visit_assignment(*this);
+        }
+    };
+
+    class With: public Expr {
+    public:
+        std::vector<std::pair<std::string, std::unique_ptr<ast::Expr>>> assignments;
+        std::unique_ptr<ast::Expr> body;
+        With(   
+            std::vector<std::pair<std::string, std::unique_ptr<ast::Expr>>> assignments, 
+            std::unique_ptr<ast::Expr> body
+        ): assignments(std::move(assignments)), body(std::move(body)) {}
+
+        void visit(Visitor& visitor) override {
+            visitor.visit_with(*this);
         }
     };
 }

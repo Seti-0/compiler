@@ -142,12 +142,14 @@ namespace {
         Proto ::= (identifier | ('unary' operator) | ('binary' operator number)) '(' identifier* ')' 
 
         Expr ::= Primary (operator SKIP Primary)*
-        Primary ::= For | If | Call | Group | Num | Unary
+        Primary ::= With | Unary | For | If | Call | Var | Group | Num
         Unary ::= operator SKIP Primary
+        With ::= 'with' SKIP identifier ('=' SKIP Expr)? (',' SKIP identifier ('=' SKIP Expr)?)+ SKIP 'in' SKIP Exr
         For ::= 'for' identifier '=' Expr ',' SKIP Expr (',' SKIP Expr)? SKIP 'in' SKIP Expr
         If ::= 'if' Expr 'then' SKIP Expr SKIP ('else' SKIP Expr)?
-        Call ::= Ref | FnCall
+        Var ::= Ref | Assignment | FnCall
         Ref ::= identifier
+        Assignment ::= identifier '=' Expr
         FnCall ::= identifier '(' SKIP (Expr (',' SKIP Expr)*)? SKIP ')'
         Group ::= '(' SKIP Expr SKIP ')'
         Num ::= number
@@ -329,14 +331,17 @@ namespace {
     std::unique_ptr<ast::Expr> parse_if();
     std::unique_ptr<ast::Expr> parse_for();
     std::unique_ptr<ast::Expr> parse_group();
+    std::unique_ptr<ast::With> parse_with();
 
-    // Primary ::= Num | Group | Call | If | For | Unary
+    // Primary ::= Num | Group | Var | If | For | With | Unary
     std::unique_ptr<ast::Expr> parse_primary() {
         try {
             if (tokens::current::is_keyword("if"))
                 return parse_if();
             else if (tokens::current::is_keyword("for"))
                 return parse_for();
+            else if (tokens::current::is_keyword("with"))
+                return parse_with();
             else if (tokens::current::is_key_symbol('('))
                 return parse_group();
             else if (tokens::current::is(tokens::OPERATOR))
@@ -362,6 +367,59 @@ namespace {
         tokens::skip_newlines(); // Expression definitely not finished.
         std::unique_ptr<ast::Expr> rhs = parse_primary();
         return std::make_unique<ast::Un>(op, std::move(rhs));
+    }
+
+    // With ::= 'with' SKIP identifier ('=' SKIP Expr)? (',' SKIP identifier ('=' SKIP Expr)?)+ SKIP 'in' SKIP Exr
+    std::unique_ptr<ast::With> parse_with() {
+        if (!tokens::current::is_keyword("with"))
+            throw std::runtime_error("Expected 'with' at the beginning of 'with' expression.");
+
+        std::vector<std::pair<std::string, std::unique_ptr<ast::Expr>>> assignments;
+
+        do {
+            tokens::next(); // Move past the 'with' keyword, or the ',' symbol.
+            tokens::skip_newlines(); // Expression definitely not finished.
+
+            if (!tokens::current::is(tokens::IDENTIFIER))
+                throw std::runtime_error("Expected variable assignment in with to begin with identifier.");
+            std::string current_name = tokens::current::text;
+            tokens::next(); // Move past the identifier.
+
+            std::unique_ptr<ast::Expr> current_expr = nullptr;
+            if (tokens::current::is_key_symbol('=')) {
+                tokens::next(); // Move past the '=' symbol.
+                tokens::skip_newlines(); // Definitely not done.
+                try {
+                    current_expr = parse_expr();
+                } 
+                catch (...) {
+                    util::rethrow(__func__, "assignment value");
+                    return nullptr;
+                }
+            }
+
+            assignments.push_back(std::move(std::pair<std::string, std::unique_ptr<ast::Expr>>(current_name, std::move(current_expr))));
+        } while (tokens::current::is_key_symbol(','));
+
+        if (assignments.size() == 0)
+            throw std::runtime_error("Expected variable identifier after 'with' keyword.");
+        
+        tokens::skip_newlines(); // The body can start on the next line.
+        if (!tokens::current::is_keyword("in"))
+            throw std::runtime_error("Expected 'in' keyword after 'with' expression header.");
+        tokens::next(); // Move past the 'in' keyword.
+        tokens::skip_newlines();
+
+        std::unique_ptr<ast::Expr> body;
+        try {
+            body = parse_expr();
+        }
+        catch (...) {
+            util::rethrow(__func__, "body");
+            return nullptr;
+        }
+
+        return std::make_unique<ast::With>(std::move(assignments), std::move(body));
     }
 
     // Binary operators and precedence
@@ -564,16 +622,34 @@ namespace {
         return std::make_unique<ast::If>(std::move(condition), std::move(a), std::move(b));
     }
 
-    // Call ::= Ref | FnCall
+    // Call ::= Ref | FnCall | Assignment
     // Ref ::= identifier
     // FnCall ::= identifier '(' (expression (',' expression)*)? ')'
+    // Assignment ::= identifier '=' Expr
     std::unique_ptr<ast::Expr> parse_identifier() {
         if (!tokens::current::is(tokens::IDENTIFIER))
             throw std::runtime_error("Tried to parse token that was not an identifier, as an identifier.");
         std::string name = tokens::current::text; // Use the current identifier token.
         tokens::next(); // Move on from the identifier.
 
-        if (!tokens::current::is_key_symbol('(')) // No open bracket means a basic reference.
+        // It could be an assignment.
+        if (tokens::current::is_key_symbol('=')) {
+            tokens::next(); // Move on from '='
+            tokens::skip_newlines(); // Definitely not done.
+            std::unique_ptr<ast::Expr> value;
+            try {
+                value = parse_expr();
+            }
+            catch (...) {
+                util::rethrow(__func__, "assignment value");
+                return nullptr;
+            }
+            return std::make_unique<ast::Assignment>(name, std::move(value));
+        }
+
+        // If it's not an assignment or a followed by an open bracket (a call),#
+        // then it is a basic reference.
+        if (!tokens::current::is_key_symbol('('))
             return std::make_unique<ast::Var>(name);
 
         // Else, a function call.

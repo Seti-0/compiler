@@ -327,7 +327,7 @@ namespace {
 
             if (current::text == "def"  || current::text == "extern" || current::text == "import"
                 || current::text == "if" || current::text == "then" || current::text == "else"
-                || current::text == "for" || current::text == "in" 
+                || current::text == "for" || current::text == "in" || current::text == "with"
                 || current::text == "unary" || current::text == "binary"
             ) {
                 current::kind = KEYWORD;

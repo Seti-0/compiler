@@ -137,5 +137,30 @@ public:
         
         current += ")";
         result = current;
-    };
+    }
+
+    void visit_assignment(ast::Assignment& target) override {
+        target.value->visit(*this);
+        result = "Assignment(" + target.identifier + ", " + result + ")";
+    }
+
+    void visit_with(ast::With& target) override {
+        std::string pairs = "";
+        if (target.assignments.size() > 0) {
+            pairs += target.assignments[0].first;
+            if (target.assignments[0].second) {
+                target.assignments[0].second->visit(*this);
+                pairs += ", " + result;
+            }
+            for (int i = 1; i < target.assignments.size(); i++) {
+                pairs += ", " + target.assignments[i].first;
+                if (target.assignments[i].second) {
+                    target.assignments[i].second->visit(*this);
+                    pairs += ", " + result;
+                }
+            }
+        }
+        target.body->visit(*this);
+        result = "With(" + pairs + ", " + result + ")";
+    }
 };

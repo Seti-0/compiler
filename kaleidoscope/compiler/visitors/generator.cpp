@@ -267,7 +267,7 @@ namespace gen {
                 value = fn;
             }
 
-            void visit_if(ast::If& target) {
+            void visit_if(ast::If& target) override {
                 try {
                     target.cond->visit(*this);
                 } catch(...) {
@@ -413,14 +413,22 @@ namespace gen {
                 value = llvm::ConstantFP::getNullValue(llvm::Type::getDoubleTy(*context));
             }
 
-            void visit_import(ast::Import& target) {
+            void visit_import(ast::Import& target) override {
                 throw std::runtime_error("Internal error: attempted to generate IR for an import statement!");
             }
 
-            void visit_block(ast::Block& target) {
+            void visit_block(ast::Block& target) override {
                 for (const std::unique_ptr<ast::Statement>& statement: target.statements) {
                     statement->visit(*this);
                 }
+            }
+
+            void visit_with(ast::With& target) override {
+                throw std::runtime_error("Not implemented!");
+            }
+
+            void visit_assignment(ast::Assignment& target) override {
+                throw std::runtime_error("Not implemented!");
             }
         };
     }
