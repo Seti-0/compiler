@@ -2,6 +2,7 @@
 
 #include <string>
 #include <iostream>
+#include <sstream>
 #include <vector>
 #include <memory>
 #include <map>
@@ -16,6 +17,9 @@ namespace tokens {
 bool debug = false;
 
 enum TokenKind {
+    // The start, before any token has been read.
+    START,
+
     // Keywords
     // The value is stored at tokens::current:text.
     KEYWORD,
@@ -40,9 +44,17 @@ enum TokenKind {
     END,
 };
 
+std::array<char, 6> KEY_SYMBOLS = {'\n', ';', '(', ',', ')', '='};
+std::array<std::string, 11> KEYWORDS = {
+    "def", "extern", "import",
+    "if", "then", "else",
+    "for", "with", "in",
+    "unary", "binary"
+};
+
 // Main entry point to tokenization.
 namespace current {
-    TokenKind kind;
+    TokenKind kind = START;
 
     // WARNING: If the current token does not make use of these, they
     // could contain anything! (Usually they would contain the content
@@ -108,9 +120,22 @@ namespace current {
     }
 }
 
-bool has_current = false;
+std::istream* stream = &std::cin;
+void set_input(std::istream& new_stream) {
+    stream = &new_stream;
+    current::kind = START;
+}
+
+bool has_current() {
+    return current::kind != START && current::kind != END;
+}
+
+bool has_next() {
+    return current::kind != END;
+}
 
 void next();
+
 
 /*
     EXAMPLES & TESTS
@@ -123,14 +148,28 @@ llvm::Error interactive() {
     printf("Spacing is ignored, usually.");
     printf(" (Newlines can be optionally returned, for the sake of interactive mode)\n");
     printf("Comments begin with a '#'.\n");
-    printf("Keywords: def, extern, if, then, for, in\n");
-    printf("Otherwise it's just numbers, identifiers.\n");
-    printf("Anything that is none of the above is an 'other token'\n");
+    
+    printf("Key symbols: ");
+    for (char& symbol: KEY_SYMBOLS) {
+        if (symbol == '\n') printf("'\\n' ");
+        else printf("'%s' ", std::string(1, symbol).c_str());
+    }
+    printf("\n");
+    
+    printf("Keywords: ");
+    for (std::string& keyword: KEYWORDS) printf("'%s' ", keyword.c_str());
+    printf("\n");
+    
+    printf("Otherwise it's just numbers, operators, and identifiers.\n");
     printf("\n");
 
     debug = true;
-    while (true)
+    printf("tokens> ");
+    while (true) {
+        if (current::is_key_symbol('\n'))
+            printf("tokens> ");
         next();
+    }
     
     return llvm::Error::success();
 }
@@ -141,94 +180,6 @@ llvm::Error interactive() {
 /*
     TOKENIZATION
 */
-
-namespace {
-    namespace chars {
-        char current;
-        bool has_current = false;
-
-        namespace {
-            // These are sources for characters. If both are null,
-            // the standard input is used instead.
-            std::unique_ptr<std::ifstream> file;
-            std::shared_ptr<std::string> source;
-
-            // Only used when the current source is a string.
-            int index;
-        }
-
-        void set_source_text(std::shared_ptr<std::string> new_source) {
-            source = std::move(new_source);
-            file = nullptr;
-            index = 0;
-        }
-
-        // Read from the given file, instead of the console input.
-        void set_source_file(std::string filename) {
-            file = std::make_unique<std::ifstream>(filename);
-            source = nullptr;
-        }
-
-        // Set the source back to the standard input.
-        void reset_source() {
-            source = nullptr;
-            file = nullptr;
-        }
-
-        bool has_next() {
-            if (source) {
-                int size = source->size();
-                return index < size;
-            }
-            else if (file) {
-                return file->is_open() && file->good() && !file->eof();
-            }
-            else {
-                return true;
-            }
-        }
-
-        void next() {
-            if (source) {
-                int size = source->size();
-                // If a string has been given, read from it.
-                has_current = index >= 0 && index < size;
-                if (has_current) {
-                    current = (*source)[index];
-                    index++;
-                }
-                else {
-                    current = EOF;
-                }
-            }
-            else if (file) {
-                // If a file has been given, read from it.
-                int result = EOF;
-                if (file->is_open() && file->good()) 
-                    int result = file->get();
-                
-                if (!file->eof() && file->fail())
-                    printf("WARNING: FAILED TO READ FROM FILE.\n");
-
-                has_current = result != EOF;
-                if (has_current)
-                    current = result;                
-            }
-            else {
-                // Else, read from the standard input.
-                int result = getchar();
-                has_current = result != EOF;
-                
-                if (has_current)
-                    current = result;
-            }
-        }
-    }
-}
-
-bool has_next() {
-    return chars::has_next();
-}
 
 // Moving through tokens.
 // These can be single characters, such as with key symbols.
@@ -255,23 +206,15 @@ void skip_newlines() {
         next();
 }
 
-// Move to the next non-newline token.
-void next_solid() {
-    next();
-    skip_newlines();
-}
-
 namespace {
     // Read in a single token from the command line.
     void read_token() {
-        has_current = true;
+        if (!stream) {
+            throw std::runtime_error("Attempted to read token from null stream!");
+        }
 
-        // Make sure there is a current char.
-        if (!chars::has_current)
-            chars::next();
-
-        // If there still isn't one, then it means EOF has been reached.
-        if (!chars::has_current) {
+        if (stream->eof()) {
+            // The end of the input stream has been reached.
             current::kind = END;
             return;
         }
@@ -281,28 +224,26 @@ namespace {
         // - When '\n' is enountered, it is returned as a symbol
         // - However, after returning '\n', any more whitespace (including newlines!)
         // after that is ignored until the next non-newline token.
-        
+
         // Note: current::is_key_symbol refers to the latest token read, NOT the current character.
         if (current::is_key_symbol('\n')) {
-            while (chars::has_current && isspace(chars::current))
-                chars::next();
+            while ((!stream->eof()) && isspace(stream->peek()))
+                stream->get();
         }
         else {
-            while (chars::has_current && isspace(chars::current) && chars::current != '\n')
-                chars::next();
+            while ((!stream->eof()) && isspace(stream->peek()) && (stream->peek() != '\n'))
+                stream->get();
             
-            if (chars::current == '\n') {
+            if (stream->peek() == '\n') {
 
                 // DO NOT move past this newline!
                 // nextChar()
 
-                // The current token is now a newline, so in the 
+                // The current peek is now a newline, so in the 
                 // next call to this function, all whitespace will 
-                // be skipped anyways. 
-
-                // Meanwhile, nextChar() would cause a pause until the entire
-                // next line is input by the next user, since input is buffered
-                // between newlines.
+                // be skipped anyways. If we were to attempt to move past
+                // this, though, the function would hang after the enter key
+                // has been pressed.
 
                 current::symbol = '\n';
                 current::kind = KEY_SYMBOL;
@@ -311,25 +252,20 @@ namespace {
         }
 
         // After moving past whitespace, EOF may have been reached.
-        if (!chars::has_current) {
+        if (stream->eof()) {
             current::kind = END;
             return;
         }
 
-        // Recognize keywords and identifiers
-
-        if (isalpha(chars::current)) {
+        // Recognize keywords and identifiers.
+        if (isalpha(stream->peek())) {
             current::text = "";
-            while (isalnum(chars::current)) {
-                current::text += chars::current;
-                chars::next();
+            while (isalnum(stream->peek())) {
+                current::text += stream->peek();
+                stream->get();
             }
 
-            if (current::text == "def"  || current::text == "extern" || current::text == "import"
-                || current::text == "if" || current::text == "then" || current::text == "else"
-                || current::text == "for" || current::text == "in" || current::text == "with"
-                || current::text == "unary" || current::text == "binary"
-            ) {
+            if (std::find(KEYWORDS.begin(), KEYWORDS.end(), current::text) != std::end(KEYWORDS)) {
                 current::kind = KEYWORD;
                 return;
             }
@@ -338,11 +274,12 @@ namespace {
             return;
         }
 
-        if (isdigit(chars::current) || chars::current == '.') {
+        // Recognize numbers.
+        if (isdigit(stream->peek()) || stream->peek() == '.') {
             std::string NumStr;
-            while (isdigit(chars::current) || chars::current == '.') {
-                NumStr += chars::current;
-                chars::next();
+            while (isdigit(stream->peek()) || stream->peek() == '.') {
+                NumStr += stream->peek();
+                stream->get();
             }
 
             current::num = strtod(NumStr.c_str(), 0);
@@ -352,10 +289,9 @@ namespace {
 
         // Ignore the current line if it is a comment,
         // and move straight to the next line. (Recursively)
-
-        if (chars::current == '#') {
-            while (chars::has_current && chars::current != '\n')
-                chars::next();
+        if (stream->peek() == '#') {
+            while ((!stream->eof()) && stream->peek() != '\n')
+                stream->get();
             
             return read_token();
         }
@@ -363,16 +299,14 @@ namespace {
         // If the character is not recognized as a token,
         // return it as a character. i.e. Key symbol.
 
-        current::symbol = chars::current;
-        chars::next(); // Move past the symbol.
-
-        if (current::symbol == '\n' || current::symbol == ';'
-            || current::symbol == '(' || current::symbol == ',' || current::symbol == ')'
-            || current::symbol == '=')
+        current::symbol = stream->peek();
+        if (std::find(KEY_SYMBOLS.begin(), KEY_SYMBOLS.end(), current::symbol) != std::end(KEY_SYMBOLS))
             current::kind = KEY_SYMBOL;
         else
             current::kind = OPERATOR;
         
+       stream->get(); // Move past the symbol.
+
         return;
     }
 }

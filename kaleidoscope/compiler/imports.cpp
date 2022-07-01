@@ -8,6 +8,8 @@ namespace builtins {
     std::map<std::string, std::shared_ptr<std::string>> map;
 
     void init() {
+        map["test"] = std::make_shared<std::string>("42");
+
         // A prelude with simple utilities.
         map["pre"] = std::make_shared<std::string>(R"(
             extern sin(x)

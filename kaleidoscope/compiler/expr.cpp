@@ -74,17 +74,18 @@ void input(std::string promt) {
         return;
     }
 
-    if (interactive_mode && ((!tokens::has_current) || tokens::current::is_key_symbol('\n') || tokens::current::is(tokens::END))) {
-        if (promt.size() > 0) printf("%s> ", promt.c_str());
+    if (tokens::current::is(tokens::START) || tokens::current::is_key_symbol('\n')) {
+        if (interactive_mode && promt.size() > 0)
+            printf("%s> ", promt.c_str());
         tokens::next();
+        tokens::skip_newlines();
     }
-
     std::vector<std::unique_ptr<ast::Statement>> vector;
     std::unique_ptr<ast::Block> result_block = std::make_unique<ast::Block>(std::move(vector));
 
     // The condition on this while should be the 'not' of the condition above, so that the
     // promt is printed after this is reached.
-    while (tokens::has_current && !((interactive_mode && tokens::current::is_key_symbol('\n')) || tokens::current::is(tokens::END))) {
+    while (tokens::has_current() && !(interactive_mode && tokens::current::is_key_symbol('\n'))) {
         if (tokens::current::is_key_symbol(';') || ((!interactive_mode) && tokens::current::is_key_symbol('\n'))) {
             tokens::next();
             continue;
@@ -93,7 +94,7 @@ void input(std::string promt) {
         try {
             result_block->statements.push_back(std::move(parse_statement()));
 
-            if (!(tokens::current::is_key_symbol(';') || tokens::current::is_key_symbol('\n') || tokens::current::is(tokens::END)))
+            if (tokens::has_current() && !(tokens::current::is_key_symbol(';') || tokens::current::is_key_symbol('\n')))
                 throw std::runtime_error("End of statement expected.");
         } catch (std::exception& e) {
             util::print_exception(e);

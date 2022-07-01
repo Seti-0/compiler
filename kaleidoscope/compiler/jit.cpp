@@ -157,13 +157,14 @@ namespace jit {
             return;
         }
 
-        tokens::chars::set_source_text(builtins::map[key]);
+        std::istringstream stream(*builtins::map[key]);
+        tokens::set_input(stream);
         expr::interactive_mode = false;
 
         while(tokens::has_next())
             execute("");
         
-        tokens::chars::reset_source();
+        tokens::set_input(std::cin);
         expr::interactive_mode = true;
     }
 

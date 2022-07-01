@@ -6,6 +6,7 @@
 #include <memory>
 #include <map>
 
+//#include "compiler/tokens.cpp"
 #include "compiler/jit.cpp"
 
 // As I understand it, there was an errant (unlisted) breaking change for visual c++ and a specific api.
@@ -28,6 +29,8 @@
 // TODO: Fix for loop end condition going one too far.
 // TODO: Fix two imports in the same block causing problems. e.g. import pre;import mandel
 // TODO: Rebuild LLVM and document the setup for this project.
+// TODO: Cleanup key words.
+// TODO: Don't recurse on comments when tokenizing.
 
 int main() {
     //tokens::debug = true;
