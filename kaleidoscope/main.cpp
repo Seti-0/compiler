@@ -27,6 +27,7 @@
 // TODO: Fix output from extern functions when importing. Maybe regroup extern definition output?
 // TODO: Fix for loop end condition going one too far.
 // TODO: Fix two imports in the same block causing problems. e.g. import pre;import mandel
+// TODO: Rebuild LLVM and document the setup for this project.
 
 int main() {
     //tokens::debug = true;
