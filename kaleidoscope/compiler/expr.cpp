@@ -95,7 +95,7 @@ void input(std::string promt) {
             result_block->statements.push_back(std::move(parse_statement()));
 
             if (tokens::has_current() && !(tokens::current::is_key_symbol(';') || tokens::current::is_key_symbol('\n')))
-                throw std::runtime_error("End of statement expected.");
+                util::init_throw(__func__, "End of statement expected.");
         } catch (std::exception& e) {
             util::print_exception(e);
             printf("(Error Token: %s)\n", tokens::current::describe().c_str());
@@ -187,11 +187,11 @@ namespace {
 
     std::unique_ptr<ast::Import> parse_import() {
         if (!tokens::current::is_keyword("import"))
-            throw std::runtime_error("Attempted to parse statement not beginning with 'import' as an import statement.");
+            util::init_throw(__func__, "Attempted to parse statement not beginning with 'import' as an import statement.");
         tokens::next(); // Move past the 'import' keyword.
 
         if (!tokens::current::is(tokens::IDENTIFIER))
-            throw std::runtime_error("Expected file identifier after 'import' keyword.");
+            util::init_throw(__func__, "Expected file identifier after 'import' keyword.");
         std::string name = tokens::current::text;
         tokens::next(); // Move past the file identifier.
 
@@ -217,7 +217,7 @@ namespace {
     // FnDef ::= 'def' Proto Expr
     std::unique_ptr<ast::Fn> parse_def() {
         if (!tokens::current::is_keyword("def"))
-            throw std::runtime_error("Expected 'def' at the start of function definition.");
+            util::init_throw(__func__, "Expected 'def' at the start of function definition.");
         tokens::next(); // Move past def
 
         try {
@@ -241,7 +241,7 @@ namespace {
     // Extern ::= 'extern' Proto 
     std::unique_ptr<ast::Pro> parse_extern() {
         if (!tokens::current::is_keyword("extern"))
-            throw std::runtime_error("Expected keyword 'extern' at the start of external definition." );
+            util::init_throw(__func__, "Expected keyword 'extern' at the start of external definition." );
         tokens::next(); // Move past extern
 
         try {
@@ -264,7 +264,7 @@ namespace {
         else if (tokens::current::is_keyword("unary")) {
             tokens::next(); // Move past the keyword 'unary'.
             if (!tokens::current::is(tokens::OPERATOR))
-                throw std::runtime_error("Expected operator symbol after keyword 'unary'.");
+                util::init_throw(__func__, "Expected operator symbol after keyword 'unary'.");
             name = "unary" + std::string(1, tokens::current::symbol);
             expected_arg_count = 1;
             tokens::next(); // Move past the operator symbol.
@@ -272,21 +272,21 @@ namespace {
         else if (tokens::current::is_keyword("binary")) {
             tokens::next(); // Move past the keyword 'binary'.
             if (!tokens::current::is(tokens::OPERATOR))
-                throw std::runtime_error("Expected operator symbol after keyword 'binary'.");
+                util::init_throw(__func__, "Expected operator symbol after keyword 'binary'.");
             name = "binary" + std::string(1, tokens::current::symbol);
             tokens::next(); // Move past the operator symbol.
             if (!tokens::current::is(tokens::NUMBER))
-                throw std::runtime_error("Expected precedence after keyword binary and operator symbol.");
+                util::init_throw(__func__, "Expected precedence after keyword binary and operator symbol.");
             precedence = tokens::current::num;
             expected_arg_count = 2;
             tokens::next(); // Move past the precedence number.
         }
         else {
-            throw std::runtime_error("Expected identifier, 'binary', or 'unary' at the beginning of prototype.");
+            util::init_throw(__func__, "Expected identifier, 'binary', or 'unary' at the beginning of prototype.");
         }
 
         if (!tokens::current::is_key_symbol('('))
-            throw std::runtime_error("Expected '(' after prototype identification.");
+            util::init_throw(__func__, "Expected '(' after prototype identification.");
         tokens::next(); // Move past '('
 
         std::vector<std::string> arg_names;
@@ -299,14 +299,14 @@ namespace {
             printf("NOTE: Prototype arguments aren't comma delimited. E.g.: 'def f(a b)'\n");
 
         if (!tokens::current::is_key_symbol(')'))
-            throw std::runtime_error("Expected ')' at the end of prototype arguments");
+            util::init_throw(__func__, "Expected ')' at the end of prototype arguments");
         tokens::next(); // Move past ')'
 
         if (expected_arg_count != arg_names.size()) {
             if (expected_arg_count == 1)
-                throw std::runtime_error("Expected strictly 1 argument for a unary operator.");
+                util::init_throw(__func__, "Expected strictly 1 argument for a unary operator.");
             else if (expected_arg_count == 2)
-                throw std::runtime_error("Expected strictly 2 arguments for a binary operator.");
+                util::init_throw(__func__, "Expected strictly 2 arguments for a binary operator.");
         }
 
         return std::make_unique<ast::Pro>(name, std::move(arg_names), precedence);
@@ -356,13 +356,13 @@ namespace {
             return nullptr;
         }
 
-        throw std::runtime_error("Expected identifier, number, or '('.");
+        util::init_throw(__func__, "Expected identifier, number, or '('.");
     } 
 
     // Unary ::= operator Primary
     std::unique_ptr<ast::Expr> parse_unary() {
         if (!tokens::current::is(tokens::OPERATOR))
-            throw std::runtime_error("Expected operator at the beginning of unary expression.");
+            util::init_throw(__func__, "Expected operator at the beginning of unary expression.");
         char op = tokens::current::symbol;
         tokens::next(); // Move past the operator symbol.
         tokens::skip_newlines(); // Expression definitely not finished.
@@ -373,7 +373,7 @@ namespace {
     // With ::= 'with' SKIP identifier ('=' SKIP Expr)? (',' SKIP identifier ('=' SKIP Expr)?)+ SKIP 'in' SKIP Exr
     std::unique_ptr<ast::With> parse_with() {
         if (!tokens::current::is_keyword("with"))
-            throw std::runtime_error("Expected 'with' at the beginning of 'with' expression.");
+            util::init_throw(__func__, "Expected 'with' at the beginning of 'with' expression.");
 
         std::vector<std::pair<std::string, std::unique_ptr<ast::Expr>>> assignments;
 
@@ -382,7 +382,7 @@ namespace {
             tokens::skip_newlines(); // Expression definitely not finished.
 
             if (!tokens::current::is(tokens::IDENTIFIER))
-                throw std::runtime_error("Expected variable assignment in with to begin with identifier.");
+                util::init_throw(__func__, "Expected variable assignment in with to begin with identifier.");
             std::string current_name = tokens::current::text;
             tokens::next(); // Move past the identifier.
 
@@ -403,11 +403,11 @@ namespace {
         } while (tokens::current::is_key_symbol(','));
 
         if (assignments.size() == 0)
-            throw std::runtime_error("Expected variable identifier after 'with' keyword.");
+            util::init_throw(__func__, "Expected variable identifier after 'with' keyword.");
         
         tokens::skip_newlines(); // The body can start on the next line.
         if (!tokens::current::is_keyword("in"))
-            throw std::runtime_error("Expected 'in' keyword after 'with' expression header.");
+            util::init_throw(__func__, "Expected 'in' keyword after 'with' expression header.");
         tokens::next(); // Move past the 'in' keyword.
         tokens::skip_newlines();
 
@@ -503,16 +503,16 @@ namespace {
     // For ::= 'for' identifier '=' start:Expr ',' end:Expr (',' inc:Expr) 'in' body:Expr
     std::unique_ptr<ast::Expr> parse_for() {
         if (!tokens::current::is_keyword("for"))
-            throw std::runtime_error("Tried to parse a series of tokens which don't start with 'for', as a for-expression.");
+            util::init_throw(__func__, "Tried to parse a series of tokens which don't start with 'for', as a for-expression.");
         tokens::next(); // Move on from the 'for' keyword.
 
         if (!tokens::current::is(tokens::IDENTIFIER))
-            throw std::runtime_error("Expected variable name after 'for' keyword.");
+            util::init_throw(__func__, "Expected variable name after 'for' keyword.");
         std::string var_name = tokens::current::text;
         tokens::next(); // Move on from the identifier.
 
         if (!tokens::current::is_key_symbol('='))
-            throw std::runtime_error("Expected '=' after variable name for assignment in for loop.");
+            util::init_throw(__func__, "Expected '=' after variable name for assignment in for loop.");
         tokens::next(); // Move on from the '=' symbol.
 
         std::unique_ptr<ast::Expr> start;
@@ -525,7 +525,7 @@ namespace {
         }
 
         if (!tokens::current::is_key_symbol(','))
-            throw std::runtime_error("Expected ',' after variable declaration in for-expression.");
+            util::init_throw(__func__, "Expected ',' after variable declaration in for-expression.");
         tokens::next(); // Move on from the ',' symbol.
         tokens::skip_newlines(); // Allow each header segment to be on a separate line.
 
@@ -552,7 +552,7 @@ namespace {
         // I'm being free with newlines here.
         tokens::skip_newlines();
         if (!tokens::current::is_keyword("in"))
-            throw std::runtime_error("Expected 'in' keyword before body in for-expression.");
+            util::init_throw(__func__, "Expected 'in' keyword before body in for-expression.");
         tokens::next(); // Move on from the 'in' keyword.
         tokens::skip_newlines();
 
@@ -572,7 +572,7 @@ namespace {
     // If ::= 'if' cond:Expr 'then' a:Expr ('else' b:Expr)?
     std::unique_ptr<ast::Expr> parse_if() {
         if (!tokens::current::is_keyword("if"))
-            throw std::runtime_error("Tried to parse a series of tokens which don't start with 'if', as an if-expression.");
+            util::init_throw(__func__, "Tried to parse a series of tokens which don't start with 'if', as an if-expression.");
         tokens::next(); // Move on from the 'if' keyword.
 
         std::unique_ptr<ast::Expr> condition;
@@ -588,7 +588,7 @@ namespace {
         // the header, or on its own, it doesn't matter.
         tokens::skip_newlines();
         if (!tokens::current::is_keyword("then"))
-            throw std::runtime_error("Expected 'then' keyword after 'if' and condition expression.");
+            util::init_throw(__func__, "Expected 'then' keyword after 'if' and condition expression.");
         tokens::next(); // Move on from the 'then' keyword.
         // The if statement body can be on the next line.
         tokens::skip_newlines();
@@ -629,7 +629,7 @@ namespace {
     // Assignment ::= identifier '=' Expr
     std::unique_ptr<ast::Expr> parse_identifier() {
         if (!tokens::current::is(tokens::IDENTIFIER))
-            throw std::runtime_error("Tried to parse token that was not an identifier, as an identifier.");
+            util::init_throw(__func__, "Tried to parse token that was not an identifier, as an identifier.");
         std::string name = tokens::current::text; // Use the current identifier token.
         tokens::next(); // Move on from the identifier.
 
@@ -663,14 +663,14 @@ namespace {
                 if (auto arg = parse_expr())
                     args.push_back(std::move(arg));
                 else
-                    throw std::runtime_error("Expected expression after '(' or ',' in function argument list.");
+                    util::init_throw(__func__, "Expected expression after '(' or ',' in function argument list.");
                 tokens::skip_newlines(); // Definitely not finished.
 
                 if (tokens::current::is_key_symbol(')'))
                     break;
 
                 if (!tokens::current::is_key_symbol(','))
-                    throw std::runtime_error("Expected ')' or ',' after expression in function argument list.");
+                    util::init_throw(__func__, "Expected ')' or ',' after expression in function argument list.");
                 
                 tokens::next(); // Move on from ','
                 tokens::skip_newlines(); // Definitely not finished here.
@@ -685,7 +685,7 @@ namespace {
     // Group ::= '(' Expr ')'
     std::unique_ptr<ast::Expr> parse_group() {
         if (!tokens::current::is_key_symbol('('))
-            throw std::runtime_error("Expected '(' at the beginning of an expression group.");
+            util::init_throw(__func__, "Expected '(' at the beginning of an expression group.");
         tokens::next(); // Move on from '('
         tokens::skip_newlines(); // Definitely not finished here.
 
@@ -699,7 +699,7 @@ namespace {
 
         tokens::skip_newlines(); // Not finished until that last bracket is added in.        
         if (!tokens::current::is_key_symbol(')'))
-            throw std::runtime_error("Expected ')'");
+            util::init_throw(__func__, "Expected ')'");
 
         tokens::next(); // Move on from ')'
 
@@ -709,7 +709,7 @@ namespace {
     // Num ::= number
     std::unique_ptr<ast::Expr> parse_number() {
         if (!tokens::current::is(tokens::NUMBER))
-            throw std::runtime_error("Attempted to parse token that was not a number, as a number.");
+            util::init_throw(__func__, "Attempted to parse token that was not a number, as a number.");
 
         auto result = std::make_unique<ast::Num>(tokens::current::num);
         tokens::next(); // Move on from the number.

@@ -21,16 +21,8 @@
 #    pragma comment(linker, "/alternatename:__imp___std_init_once_begin_initialize=__imp_InitOnceBeginInitialize")
 #endif
 
-// TODO: Fix tracing starting one level up from where it should.
-// TODO: Msg.
 // TODO: Refactor tokens and expressions, maybe move from globals to args & returns.
-// TODO: Consider refactoring away from using iterators in jit::execute, it's quite error-prone the way it is.
-// TODO: Fix output from extern functions when importing. Maybe regroup extern definition output?
-// TODO: Fix for loop end condition going one too far.
-// TODO: Fix two imports in the same block causing problems. e.g. import pre;import mandel
 // TODO: Rebuild LLVM and document the setup for this project.
-// TODO: Cleanup key words.
-// TODO: Don't recurse on comments when tokenizing.
 
 int main() {
     //tokens::debug = true;

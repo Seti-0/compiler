@@ -4,6 +4,22 @@
 #include <string>
 #include <map>
 
+#ifdef _WIN32
+#define DLLEXPORT __declspec(dllexport)
+#else
+#define DLLEXPORT
+#endif
+
+extern "C" DLLEXPORT double printc(double X) {
+  fputc((char)X, stdout);
+  return 0;
+}
+
+extern "C" DLLEXPORT double printd(double X) {
+  printf("%d", (int)X);
+  return 0;
+}
+
 namespace builtins {
     std::map<std::string, std::shared_ptr<std::string>> map;
 
@@ -15,6 +31,7 @@ namespace builtins {
             extern sin(x)
             extern sin(y)
             extern printc(x)
+            extern printd(x)
 
             def unary!(x) 
                 if x then 0 

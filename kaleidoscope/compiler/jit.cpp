@@ -20,17 +20,6 @@
 #include "gen.cpp"
 #include "imports.cpp"
 
-#ifdef _WIN32
-#define DLLEXPORT __declspec(dllexport)
-#else
-#define DLLEXPORT
-#endif
-
-extern "C" DLLEXPORT double printc(double X) {
-  fputc((char)X, stdout);
-  return 0;
-}
-
 namespace jit {
     bool debug = false;
     llvm::Error init();
@@ -169,6 +158,7 @@ namespace jit {
     }
 
     llvm::Error compile(ast::Item& item, llvm::orc::ResourceTrackerSP tracker);
+    void execute_externs(std::vector<std::unique_ptr<ast::Statement>> externs);
     llvm::Error compile_functions(std::vector<std::unique_ptr<ast::Fn>> functions);
     llvm::Expected<std::unique_ptr<double>> execute_anonymous_fn(ast::Fn& fn);
 
@@ -182,19 +172,28 @@ namespace jit {
         // I think only modules as a whole can be compiled/recompiled.
         std::vector<std::unique_ptr<ast::Fn>> functions;
 
-        for (auto it = block->statements.begin(); it != block->statements.end(); it++) {
-            ast::Fn* fn = (*it)->as_fn();
+        // Extern defs are grouped too, but this is just for the sake of neat output.
+        // No actual IR is generated for extern statements, they just register names.
+        std::vector<std::unique_ptr<ast::Statement>> externs;
+
+        for (std::unique_ptr<ast::Statement>& statement: block->statements) {
+            ast::Fn* fn = statement->as_fn();
             if (fn && fn->proto->name != "_main") {
-                std::unique_ptr<ast::Fn> taken_fn = std::unique_ptr<ast::Fn>((ast::Fn*)(*it).release());
+                std::unique_ptr<ast::Fn> taken_fn = std::unique_ptr<ast::Fn>((ast::Fn*)statement.release());
                 functions.push_back(std::move(taken_fn));
             }
-            else if (ast::Pro* pro = (*it)->as_pro()) {
-                gen::emit(*pro, layout);
-                // No code needs to be compiled or executed here. 
+            else if (ast::Pro* pro = statement->as_pro()) {
+                std::unique_ptr<ast::Pro> taken_pro = std::unique_ptr<ast::Pro>((ast::Pro*)statement.release());
+                externs.push_back(std::move(taken_pro));
             }
             else {
                 // These other actions do require that any pending functions have been
                 // compiled first.
+                if (externs.size() > 0) {
+                    execute_externs(std::move(externs));
+                    externs = std::vector<std::unique_ptr<ast::Statement>>();
+                }
+
                 if (functions.size() > 0) {
                     compile_functions(std::move(functions));
                     // Is std::move guaranteed to leave a valid (but cleared) vector,
@@ -207,20 +206,31 @@ namespace jit {
                     if (!expected) return expected.takeError();
                     result = std::move(*expected);
                 }
-                else if (ast::Import* import = (*it)->as_import()) {
+                else if (ast::Import* import = statement->as_import()) {
                     execute_builtin(import->file);
                 }
             }
         }
         // Compile any pending functions.
+        execute_externs(std::move(externs));
         compile_functions(std::move(functions));
 
         return std::move(result);
     }
 
+    void execute_externs(std::vector<std::unique_ptr<ast::Statement>> externs) {
+        if (externs.size() == 0)
+            return;
+
+        if (debug) printf("Declaring %d external symbol(s).\n", externs.size());
+        gen::emit(ast::Block(std::move(externs)), layout);
+    }
+
     llvm::Error compile_functions(std::vector<std::unique_ptr<ast::Fn>> functions) {
         if (functions.size() == 0)
             return llvm::Error::success();
+
+        if (debug) printf("Compiling %d function(s).\n", functions.size());
 
         // Remove old compiled code, find all functions that were removed by association.
 

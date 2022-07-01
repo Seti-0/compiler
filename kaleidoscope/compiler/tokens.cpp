@@ -10,6 +10,8 @@
 
 #include "llvm/Support/Error.h"
 
+#include "util.cpp"
+
 namespace tokens {
 
 // If this is true, a description of each
@@ -39,6 +41,10 @@ enum TokenKind {
     // Symbols that are not key, which are candidates for operators.
     // The value is stored at tokens::current::symbol.
     OPERATOR,
+
+    // Lines of text intended to be ignored, mostly.
+    // The value is stored at tokens::current::text.
+    COMMENT,
 
     // The End.
     END,
@@ -194,7 +200,11 @@ namespace {
 // Newlines are counted as SYMBOL tokens here.
 void next() {
     read_token();
-    
+
+    // For now I'm skipping comments entirely.
+    while (has_next() && current::is(COMMENT)) 
+        read_token();
+
     if (debug) 
         printf("%s\n", current::describe().c_str());
 }
@@ -210,7 +220,7 @@ namespace {
     // Read in a single token from the command line.
     void read_token() {
         if (!stream) {
-            throw std::runtime_error("Attempted to read token from null stream!");
+            util::init_throw(__func__, "Attempted to read token from null stream!");
         }
 
         if (stream->eof()) {
@@ -290,10 +300,15 @@ namespace {
         // Ignore the current line if it is a comment,
         // and move straight to the next line. (Recursively)
         if (stream->peek() == '#') {
-            while ((!stream->eof()) && stream->peek() != '\n')
+            stream->get(); // Move past the '#' symbol.
+
+            current::text = "";
+            while ((!stream->eof()) && stream->peek() != '\n') {
+                current::text += stream->peek();
                 stream->get();
+            }
             
-            return read_token();
+            current::kind = COMMENT;
         }
 
         // If the character is not recognized as a token,

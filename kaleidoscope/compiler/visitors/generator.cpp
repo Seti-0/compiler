@@ -155,7 +155,7 @@ namespace gen {
             void visit_var(ast::Var& target) override {
                 llvm::AllocaInst* ptr = named_values[target.name];
                 if (!ptr)
-                    throw std::runtime_error("Unknown variable '" + target.name + "'");
+                    util::init_throw(__func__, "Unknown variable '" + target.name + "'");
                 
                 value = builder->CreateLoad(llvm::Type::getDoubleTy(*context), ptr, target.name);
             }
@@ -178,7 +178,7 @@ namespace gen {
                 }
                 else {
                     std::string msg = "Unary operator not implemented: '" + std::string(1, target.op) + "'.";
-                    throw std::runtime_error(msg);
+                    util::init_throw(__func__, msg);
                 }
             }
 
@@ -213,7 +213,7 @@ namespace gen {
                         }
                         else {
                             std::string msg = "Binary operator not implemented: '" + std::string(1, target.op) + "'.";
-                            throw std::runtime_error(msg);
+                            util::init_throw(__func__, msg);
                         }
                 }
             }
@@ -221,13 +221,13 @@ namespace gen {
             void visit_call(ast::Call& target) override {
                 llvm::Function* fn = get_fn(target.callee);
                 if (!fn)
-                    throw std::runtime_error("Unknown function: '" + target.callee + "'.");
+                    util::init_throw(__func__, "Unknown function: '" + target.callee + "'.");
                 
                 if (fn->arg_size() != target.args.size()) {
                     std::string expected = std::to_string(fn->arg_size());
                     std::string found = std::to_string(target.args.size());
                     std::string name = "'" + target.callee + "'";
-                    throw std::runtime_error(expected + " args expected for function " + name + ", found " + found + ".");
+                    util::init_throw(__func__, expected + " args expected for function " + name + ", found " + found + ".");
                 }
 
                 std::vector<llvm::Value*> args;
@@ -429,7 +429,7 @@ namespace gen {
             }
 
             void visit_import(ast::Import& target) override {
-                throw std::runtime_error("Internal error: attempted to generate IR for an import statement!");
+                util::init_throw(__func__, "Internal error: attempted to generate IR for an import statement!");
             }
 
             void visit_block(ast::Block& target) override {
@@ -496,7 +496,7 @@ namespace gen {
             void visit_assignment(ast::Assignment& target) override {
                 llvm::AllocaInst* stack_ptr = named_values[target.identifier];
                 if (!stack_ptr)
-                    throw std::runtime_error("Unrecognized variable name: '" + target.identifier + "'");
+                    util::init_throw(__func__, "Unrecognized variable name: '" + target.identifier + "'");
                 
                 try {
                     target.visit(*this);

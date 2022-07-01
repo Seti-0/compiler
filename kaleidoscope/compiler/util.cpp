@@ -6,10 +6,6 @@
 #include "llvm/Support/Error.h"
 
 namespace util {
-    void initial_throw(std::string name, std::string msg) {
-        throw std::runtime_error(name + ": " + msg);
-    }
-
     void rethrow(std::string name, std::string msg)
     {
         std::string text = name;
@@ -26,6 +22,15 @@ namespace util {
 
     void rethrow(std::string name) {
         rethrow(name, "");
+    }
+
+    void init_throw(std::string name, std::string msg) {
+        try {
+            throw std::runtime_error(msg);
+        } 
+        catch(...) {
+            rethrow(name);
+        }
     }
 
     void print_exception(const std::exception& e, int level) {
