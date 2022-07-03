@@ -1,0 +1,68 @@
+#########################
+# Building LLVM Locally #
+#########################
+
+The CMake file in this project assumes that llvm-config is on the PATH, describing and llvm build.
+
+Steps taken:
+ > Cloned https://github.com/llvm/llvm-project to "C:/frep/llvm/llvm-project".
+ > Checked out the branch 'release/14.x'. 
+ > Created directory "C:/frep/llvm/build".
+ > From the newly created directory, ran cmake command: 
+   cmake -G"Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DLLVM_BUILD_TOOLS=OFF -DLLVM_TARGETS_TO_BUILD="X86;WebAssembly" -DLLVM_INSTALL_TOOLCHAIN_ONLY=ON ../llvm-project/llvm
+ > Opened resuling solution at "C:/frep/llvm/build/LLVM.sln".
+ > Built the ALL_TARGETS project on Release and Debug.
+ > Built the tools/llvm-config project on Release and Debug.
+ > Added the Debug bin folder (with llvm-config.exe) to the system path.
+
+That's all, after that it's to the CMake file in the user project, which uses llvm-config to work out paths and such.
+
+Some notes:
+ - Running the cmake command above takes a few minutes, and shows "not found" messages, which is fine.
+ - The release and debug builds take 1-3hrs each. (The debug build is longer)
+ - The release build results in a much much smaller output - 200MB in the lib folder as opposed to 3GB.
+ - Both builds do make a bunch of stuff in the bin folder other than llvm-config, I don't know if any of it is useful or used.
+ - So far, I can't figure out how to use the release build with a debug version of my project, and vice-versa. Hence building both above.
+ - I'm not convinced the -DMAKE_BUILD_TYPE or -DLLVM_INSTALL_TOOLCHAIN_ONLY arguments do anything. The -DLLVM_BUILD_TOOLS and -DLLVM_TARGETS_TO_BUILD are very important though, building all the tools and targets adds considerably to the time to compile.
+ - Apparently building in the source dir is not supported, hence separating the repo and the build folder.
+
+Some documentation on all this:
+https://www.llvm.org/docs/CMake.html
+https://www.llvm.org/docs/BuildingADistribution.html
+https://www.llvm.org/docs/GettingStarted.html
+
+#############################
+# NOTES ON CMAKE PARAMETERS #
+#############################
+
+Note that the defaults for certain cmake arguments aren't suitable for users. I changed the following in the command above:
+
+ - CMAKE_BUILD_TYPE=Release (No debug symbols, optimized)
+ - LLVM_BUILD_TOOLS=OFF (Make files for the tools are still generated)
+ - LLVM_TARGETS_TO_BUILD="X86;WebAssembly"
+ - LLVM_INSTALL_TOOLCHAIN_ONLY=ON (Removes dev tools from the list)
+ 
+CMAKE_BUILD_TYPE and LLVM_INSTALL_TOOLCHAIN_ONLY might not have actually done anything.
+The other two were definitely helpful.
+ 
+There are other ones of interest I didn't change. For example, dynamically linking LLVM from tools:
+(Not sure this is needed given that I'm not building the tools other than llvm-config, which is tiny)
+
+ - LLVM_BUILD_LLVM_DYLIB=ON
+ - LLVM_LINK_LLVM_DYLIB=ON
+ - LLVM_DYLIB_COMPONENTS=Native;WebAssembly 
+ 
+ (the input to the last one is a bit odd, see: https://www.llvm.org/docs/BuildingADistribution.html#relevant-cmake-options)
+
+Others:
+ - LLVM_ENABLE_BINDINGS (Related to OCaml and Go)
+ - LLVM_ENABLE_EH (Needed to propagate exceptions through LLVM code. Not sure when that would be needed, but worth remembering that it is NOT on by default)
+ - LLVM_ENABLE_RTTI (off by default)
+ - LLVM_COMPILER_WARNINGS (defaults to on, might be the source of some annoying stuff...)
+ - LLVM_EXTERNAL_PROJECTS  (?!! ! ??!?)
+ - LLVM_INCLUDE_(BENCHMARKS/EXAMPLES/TESTS/TOOLS)
+ - LLVM_TARGET_ARCH (useful for cross compiling)
+ - LLVM_ENABLE_(PROJECTS/RUNTIMES)=clang;etc... (used for building other things along with llvm. If llvm is the only thing of interest, this can be ignored.)
+  
+
+  

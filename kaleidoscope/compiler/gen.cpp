@@ -3,8 +3,11 @@
 #include "expr.cpp"
 #include "ast.cpp"
 
+// LLVM generates lots of warnings I can't do anything about.
+#pragma warning(push, 0)   
 #include "llvm/Support/Error.h"
 #include "llvm/Support/TargetSelect.h"
+#pragma warning(pop)
 
 #include "visitors/generator.cpp"
 

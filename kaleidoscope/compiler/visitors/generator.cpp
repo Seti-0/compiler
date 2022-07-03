@@ -8,6 +8,9 @@
 #include "../util.cpp"
 #include "../expr.cpp"
 
+// LLVM generates lots of warnings I can't do anything about.
+#pragma warning(push, 0)        
+
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
@@ -21,6 +24,8 @@
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Utils.h"
+  
+#pragma warning(pop)
 
 namespace gen {
     // This has to be kept between modules so that a call in

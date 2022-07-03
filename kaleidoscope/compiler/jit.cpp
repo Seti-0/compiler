@@ -1,5 +1,7 @@
 #pragma once
 
+// LLVM generates lots of warnings I can't do anything about.
+#pragma warning(push, 0)   
 #include "llvm/Support/Error.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ExecutionEngine/JITSymbol.h"
@@ -14,6 +16,7 @@
 #include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
 #include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
 #include "llvm/IR/DataLayout.h"
+#pragma warning(pop)
 
 #include <memory>
 
@@ -222,7 +225,7 @@ namespace jit {
         if (externs.size() == 0)
             return;
 
-        if (debug) printf("Declaring %d external symbol(s).\n", externs.size());
+        if (debug) printf("Declaring %zd external symbol(s).\n", externs.size());
         gen::emit(ast::Block(std::move(externs)), layout);
     }
 
@@ -230,7 +233,7 @@ namespace jit {
         if (functions.size() == 0)
             return llvm::Error::success();
 
-        if (debug) printf("Compiling %d function(s).\n", functions.size());
+        if (debug) printf("Compiling %zd function(s).\n", functions.size());
 
         // Remove old compiled code, find all functions that were removed by association.
 

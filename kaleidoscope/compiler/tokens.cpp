@@ -8,7 +8,10 @@
 #include <map>
 #include <fstream>
 
+// LLVM generates lots of warnings I can't do anything about.
+#pragma warning(push, 0)   
 #include "llvm/Support/Error.h"
+#pragma warning(pop)
 
 #include "util.cpp"
 

@@ -1,5 +1,9 @@
 #pragma once
 
+// There is a C4244 warning that pops up that looks loki some interaction between visual c++
+// and LLVM. I don't know why it happens, or where I can disable it specifically.
+#pragma warning( disable : 4244 )
+
 #include <string>
 #include <iostream>
 #include <vector>
@@ -22,7 +26,7 @@
 #endif
 
 // TODO: Refactor tokens and expressions, maybe move from globals to args & returns.
-// TODO: Rebuild LLVM and document the setup for this project.
+// Make a simple 'compile' command.
 
 int main() {
     //tokens::debug = true;

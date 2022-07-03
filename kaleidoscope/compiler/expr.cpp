@@ -12,7 +12,10 @@
 #include "util.cpp"
 #include "visitors/stringify.cpp"
 
+// LLVM generates lots of warnings I can't do anything about.
+#pragma warning(push, 0)   
 #include "llvm/Support/Error.h"
+#pragma warning(pop)
 
 namespace expr {
 
@@ -313,7 +316,7 @@ namespace {
     }
 
     std::unique_ptr<ast::Expr> parse_primary();
-    std::unique_ptr<ast::Expr> parse_rhs(int, std::unique_ptr<ast::Expr>);
+    std::unique_ptr<ast::Expr> parse_rhs(double, std::unique_ptr<ast::Expr>);
 
     // Expr ::= primary (operator Primary)*
     std::unique_ptr<ast::Expr> parse_expr() {
@@ -357,6 +360,7 @@ namespace {
         }
 
         util::init_throw(__func__, "Expected identifier, number, or '('.");
+        return nullptr;
     } 
 
     // Unary ::= operator Primary
@@ -425,22 +429,22 @@ namespace {
 
     // Binary operators and precedence
 
-    std::map<char, int> operator_precedence;
+    std::map<char, double> operator_precedence;
 
 }
 
-void register_precedence(char op, int precedence) {
+void register_precedence(char op, double precedence) {
     operator_precedence[op] = precedence;
 }
 
 namespace {
 
-    int get_precedence() {
+    double get_precedence() {
         if (!tokens::current::is(tokens::OPERATOR))
-            return -1;
+            return -1.;
 
         if (operator_precedence.count(tokens::current::symbol) == 0)
-            return 0;
+            return 0.;
 
         return operator_precedence[tokens::current::symbol];
     }
@@ -460,12 +464,12 @@ namespace {
     }
 
     std::unique_ptr<ast::Expr> parse_rhs(
-        int expr_precedence,
+        double expr_precedence,
         std::unique_ptr<ast::Expr> lhs
     ) {
         // If this is a binary operator, find its precedence.
         while (true) {
-            int token_precedence = get_precedence();
+            double token_precedence = get_precedence();
 
             // If this binop does not bind at least as tightly as the current binop,
             // then we are done.
@@ -490,7 +494,7 @@ namespace {
 
             // If binary_op binds less tightly with RHS than the operator after RHS, let
             // the pending operator take RHS as its LHS.
-            int next_precedence = get_precedence();
+            double next_precedence = get_precedence();
             if (token_precedence < next_precedence) {
                 rhs = parse_rhs(token_precedence + 1, std::move(rhs));
             }

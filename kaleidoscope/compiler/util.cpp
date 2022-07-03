@@ -3,7 +3,10 @@
 #include <stdexcept>
 #include <string>
 
+// LLVM generates lots of warnings I can't do anything about.
+#pragma warning(push, 0)   
 #include "llvm/Support/Error.h"
+#pragma warning(pop)
 
 namespace util {
     void rethrow(std::string name, std::string msg)
@@ -39,9 +42,16 @@ namespace util {
         else 
             printf(" -> ");
         printf(e.what());
+
         
         try {
-            std::rethrow_if_nested(e);
+            // For some reason, this line below is a compile-time error for me.
+            //std::rethrow_if_nested(e);
+
+            // This works instead, from the documentation of std::rethrow_if_nested.
+            if (auto p = dynamic_cast<const std::nested_exception*>(std::addressof(e)))
+                p->rethrow_nested();
+            
             printf("\n");
         } catch (const std::exception& e) {
             print_exception(e, level + 1);
