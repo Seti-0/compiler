@@ -35,7 +35,8 @@ namespace gen {
     namespace {
         class Generator: public Visitor {
         private:
-            std::shared_ptr<llvm::DataLayout> layout;
+            const llvm::DataLayout* layout;
+            const llvm::Triple* triple;
 
             std::unique_ptr<llvm::LLVMContext> context;
             std::unique_ptr<llvm::Module> mod;
@@ -61,6 +62,7 @@ namespace gen {
                 context = std::make_unique<llvm::LLVMContext>();
                 mod = std::make_unique<llvm::Module>(name, *context);
                 if (layout) mod->setDataLayout(*layout); 
+                if (triple) mod->setTargetTriple(triple->getTriple());
                 
                 builder = std::make_unique<llvm::IRBuilder<>>(*context);
                 
@@ -111,7 +113,7 @@ namespace gen {
                 return temp_builder.CreateAlloca(llvm::Type::getDoubleTy(*context), 0, var_name);
             }
         public:
-            Generator(std::shared_ptr<llvm::DataLayout> layout): layout(layout) {}
+            Generator(const llvm::DataLayout* layout, const llvm::Triple* triple): layout(layout), triple(triple) {}
 
             // IMPORTANT: If taking the module, the context needs to come with 
             // it as well! If the module is destroyed after the context, a segfault

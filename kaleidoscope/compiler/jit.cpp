@@ -16,12 +16,15 @@
 #include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
 #include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
 #include "llvm/IR/DataLayout.h"
+#include "llvm/Support/Host.h"
+#include "llvm/MC/TargetRegistry.h"
 #pragma warning(pop)
 
 #include <memory>
 
 #include "gen.cpp"
 #include "imports.cpp"
+#include "visitors/generator.cpp"
 
 namespace jit {
     bool debug = false;
@@ -31,7 +34,10 @@ namespace jit {
     llvm::Expected<std::unique_ptr<double>> execute(std::string promt);
 
     namespace {
-        std::shared_ptr<llvm::DataLayout> layout;
+        std::unique_ptr<llvm::DataLayout> layout;
+        const llvm::Triple* triple;
+
+        std::error_code ERROR_CODE(1, std::system_category());
     }
 
     llvm::Error interactive() {
@@ -78,6 +84,7 @@ namespace jit {
 
         std::map<std::string, std::shared_ptr<ast::Block>> associations;
         std::map<std::string, llvm::orc::ResourceTrackerSP> module_trackers;
+        std::set<std::shared_ptr<ast::Block>> blocks;
 
         const std::string LIB_NAME = "<main>";
     }
@@ -89,8 +96,7 @@ namespace jit {
     llvm::Expected<llvm::DataLayout&> get_layout() {
         if (!layout) {
             std::string msg = "No DataLayout found. Has jit::init() been called?\n";
-            std::error_code code(1, std::system_category());
-            return llvm::make_error<llvm::StringError>(code, msg);
+            return llvm::make_error<llvm::StringError>(ERROR_CODE, msg);
         }
         return *layout;
     }
@@ -100,12 +106,18 @@ namespace jit {
         if (auto error = gen::init())
             return std::move(error);
 
+        llvm::InitializeNativeTarget();
+        llvm::InitializeNativeTargetAsmParser();
+        llvm::InitializeNativeTargetAsmPrinter();
+        llvm::InitializeNativeTargetDisassembler();
+
         auto control = llvm::orc::SelfExecutorProcessControl::Create();
         if (!control)
             return std::move(control.takeError());
 
         session = std::make_unique<llvm::orc::ExecutionSession>(std::move(*control));
-        llvm::orc::JITTargetMachineBuilder builder(session->getExecutorProcessControl().getTargetTriple());
+        triple = &session->getExecutorProcessControl().getTargetTriple();
+        llvm::orc::JITTargetMachineBuilder builder(*triple);
 
         auto expected_layout = builder.getDefaultDataLayoutForTarget();
         if (!expected_layout)
@@ -122,8 +134,7 @@ namespace jit {
 
         // The lib doesn't need to be stored, it can be fetched by name later.
         // Names are required to be unique, so that isn't a concern.
-        session
-            ->createBareJITDylib(LIB_NAME)
+        session->createBareJITDylib(LIB_NAME)
             .addGenerator(llvm::cantFail(llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(layout->getGlobalPrefix())));
         
         if (builder.getTargetTriple().isOSBinFormatCOFF()) {
@@ -164,6 +175,7 @@ namespace jit {
     void execute_externs(std::vector<std::unique_ptr<ast::Statement>> externs);
     llvm::Error compile_functions(std::vector<std::unique_ptr<ast::Fn>> functions);
     llvm::Expected<std::unique_ptr<double>> execute_anonymous_fn(ast::Fn& fn);
+    llvm::Error compile_to_obj_file();
 
     llvm::Expected<std::unique_ptr<double>> execute(std::unique_ptr<ast::Block> unique_block) {
         std::shared_ptr<ast::Block> block = std::shared_ptr<ast::Block>(unique_block.release());
@@ -192,6 +204,7 @@ namespace jit {
             else {
                 // These other actions do require that any pending functions have been
                 // compiled first.
+
                 if (externs.size() > 0) {
                     execute_externs(std::move(externs));
                     externs = std::vector<std::unique_ptr<ast::Statement>>();
@@ -212,6 +225,15 @@ namespace jit {
                 else if (ast::Import* import = statement->as_import()) {
                     execute_builtin(import->file);
                 }
+                else if (ast::Command* command = statement->as_command()) {
+                    if (command->text == "compile") {
+                        if (auto error = compile_to_obj_file()) 
+                            return std::move(error);
+                    }
+                    else {
+                        util::init_throw(__func__, "Command not implemented: '" + command->text + "'");
+                    }
+                }
             }
         }
         // Compile any pending functions.
@@ -226,7 +248,7 @@ namespace jit {
             return;
 
         if (debug) printf("Declaring %zd external symbol(s).\n", externs.size());
-        gen::emit(ast::Block(std::move(externs)), layout);
+        gen::emit(ast::Block(std::move(externs)), &*layout, triple);
     }
 
     llvm::Error compile_functions(std::vector<std::unique_ptr<ast::Fn>> functions) {
@@ -257,10 +279,7 @@ namespace jit {
             for (std::shared_ptr<ast::Block>& block: to_compile) {
                 for (auto it = block->statements.begin(); it != block->statements.end();) {
                     ast::Fn* fn = (*it)->as_fn();
-                    if (!fn) {
-                        std::error_code code(1, std::system_category());
-                        return llvm::make_error<llvm::StringError>(code, "Internal error: non-function statement stored in an associated function block.");
-                    }
+                    if (!fn) return llvm::make_error<llvm::StringError>(ERROR_CODE, "Internal error: non-function statement stored in an associated function block.");
 
                     if (fn->proto->name == new_fn->proto->name) {
                         it = block->statements.erase(it);
@@ -282,6 +301,7 @@ namespace jit {
             associations[new_fn->proto->name] = new_block;
             new_block->statements.push_back(std::move(new_fn));
         }
+        blocks.insert(new_block);
         to_compile.push_back(new_block);
 
         // Compile all blocks, update all trackers.
@@ -329,7 +349,7 @@ namespace jit {
     }
 
     llvm::Error compile(ast::Item& item, llvm::orc::ResourceTrackerSP tracker) {
-        gen::emit(item, layout);
+        gen::emit(item, &*layout, triple);
         if (!gen::has_current()) {
             // TODO: Maybe thing about adding a useful name here.
             printf("WARNING: failed to regen IR for module.\n");
@@ -342,6 +362,74 @@ namespace jit {
             printf("gen::interactive (replace existing module) -> ");
             return std::move(error);
         }
+
+        return llvm::Error::success();
+    }
+
+    llvm::Error compile_to_obj_file() {
+        if (blocks.size() == 0) {
+            printf("Nothing to compile.\n");
+            return llvm::Error::success();
+        } 
+
+        printf("Compiling %zd blocks to external object file.\n", blocks.size());
+
+        std::string triple_text = llvm::sys::getDefaultTargetTriple();
+
+        std::string error;
+        const llvm::Target* target = llvm::TargetRegistry::lookupTarget(triple_text, error);
+        if (!target)
+            return llvm::make_error<llvm::StringError>(ERROR_CODE, error);
+
+        std::string cpu = "generic";
+        std::string features = "";
+        llvm::TargetOptions options;
+        auto model = llvm::Optional<llvm::Reloc::Model>();
+        llvm::TargetMachine* machine = target->createTargetMachine(triple_text, cpu, features, options, model);
+
+        // TODO: The data layout here isn't working, I don't know why.
+        // The one created for the JIT works, but that's a stopgap measure.
+        //const llvm::Triple* triple = &machine->getTargetTriple();
+        //const llvm::DataLayout* layout = &machine->createDataLayout();
+
+        gen::Generator generator(&*layout, triple);
+        try {
+            for (const std::shared_ptr<ast::Block>& block: blocks) {
+                block->visit(generator);
+            }
+        } catch(std::exception& e) {
+            util::print_exception(e);
+            generator.clear();
+            return llvm::Error::success();
+        }
+
+        if (!generator.has_result()) {
+            printf("WARNING: Failed to generator IR.\n");
+            printf("No object file created.\n");
+            return llvm::Error::success();
+        }
+
+        std::string filename = "output.o";
+        llvm::legacy::PassManager pass_manager;
+
+        std::error_code error_code;
+        llvm::raw_fd_ostream destination(filename, error_code, llvm::sys::fs::OF_None);
+        if (error_code) {
+            std::string msg = "Unable to open file: " + std::to_string(error_code.value()) + " (" + error_code.message() + ")";
+            return llvm::make_error<llvm::StringError>(ERROR_CODE, msg);
+        }
+
+        llvm::CodeGenFileType filetype = llvm::CGFT_ObjectFile;
+        if (machine->addPassesToEmitFile(pass_manager, destination, nullptr, filetype)) {
+            std::string msg = "Object file generation not supported.";
+            return llvm::make_error<llvm::StringError>(ERROR_CODE, msg);
+        }
+
+        std::unique_ptr<llvm::LLVMContext> context = generator.take_context();
+        std::unique_ptr<llvm::Module> mod = generator.take_module();
+
+        pass_manager.run(*mod);
+        destination.flush();
 
         return llvm::Error::success();
     }

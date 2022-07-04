@@ -3,11 +3,14 @@
 build/
 
 # File for misc experiments.
-./test.cpp
+test.cpp
 
-# VSCode config
+# VSCode config.
 .vscode/
 
-# Include headers for intellisense
+# Include headers for intellisense.
 llvm/
 llvm-c/
+
+# Program output.
+output.o

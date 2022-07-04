@@ -14,7 +14,7 @@
 namespace gen {
     bool debug = false;
     llvm::Error init();
-    void emit(ast::Item& source, std::shared_ptr<llvm::DataLayout> layout);
+    void emit(ast::Item&, const llvm::DataLayout*, const llvm::Triple*);
 
     llvm::Error interactive() {
         printf("IR Generation\n");
@@ -36,7 +36,7 @@ namespace gen {
             if (!expr::current)
                 continue;
             
-            emit(*expr::current, nullptr);
+            emit(*expr::current, nullptr, nullptr);
         }
 
         return llvm::Error::success();
@@ -75,12 +75,12 @@ namespace gen {
         return llvm::Error::success();
     }
 
-    void emit(ast::Item& source, std::shared_ptr<llvm::DataLayout> layout) {
+    void emit(ast::Item& source, const llvm::DataLayout* layout, const llvm::Triple* triple) {
         // Remember - the module needs to be destroyed *before* the context.
         current_module = nullptr;
         current_context = nullptr;
 
-        Generator generator(layout);
+        Generator generator(layout, triple);
         try {
             source.visit(generator);
         } catch(std::exception& e) {
