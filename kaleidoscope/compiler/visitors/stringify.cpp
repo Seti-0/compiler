@@ -163,4 +163,8 @@ public:
         target.body->visit(*this);
         result = "With(" + pairs + ", " + result + ")";
     }
+
+    void visit_command(ast::Command& target) override {
+        result = "Command(" + target.text + ")";
+    }
 };

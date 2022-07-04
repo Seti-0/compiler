@@ -16,9 +16,13 @@ namespace ast {
     class Item {
     public:
         virtual void visit(Visitor& visitor) = 0;
-        
+
         // This is a bit silly, but I needed a dynamic cast.
         virtual Import* as_import() {
+            return nullptr;
+        }
+
+        virtual Command* as_command() {
             return nullptr;
         }
 
@@ -45,11 +49,28 @@ namespace ast {
         std::vector<std::unique_ptr<Statement>> statements;
         Block(std::vector<std::unique_ptr<Statement>> statements): statements(std::move(statements)) {}
 
-        virtual void visit(Visitor& visitor) {
+        void visit(Visitor& visitor) override {
             visitor.visit_block(*this);
         }
 
         Block* as_block() override {
+            return this;
+        }
+    };
+
+    // Command. 
+    // Not really a part of the language, contains directives
+    // for the compiler.
+    class Command: public Statement {
+    public:
+        std::string text;
+        Command(std::string&& text): text(text) {}
+
+        void visit(Visitor& visitor) override {
+            visitor.visit_command(*this);
+        }
+
+        Command* as_command() override {
             return this;
         }
     };

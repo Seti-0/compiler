@@ -25,8 +25,13 @@ enum TokenKind {
     // The start, before any token has been read.
     START,
 
+    // Commands - not really a part of the language, more like
+    // preprocessor directives.
+    // The value is stored at tokens::current::text.
+    COMMAND,
+
     // Keywords
-    // The value is stored at tokens::current:text.
+    // The value is stored at tokens::current::text.
     KEYWORD,
 
     // Non-key words 
@@ -60,6 +65,9 @@ std::array<std::string, 11> KEYWORDS = {
     "for", "with", "in",
     "unary", "binary"
 };
+std::array<std::string, 1> COMMANDS = {
+    "compile"
+};
 
 // Main entry point to tokenization.
 namespace current {
@@ -89,6 +97,13 @@ namespace current {
         std::string desc;
     
         switch (kind) {
+            case START:
+                content = "start";
+                desc = "start of input";
+                break;
+            case COMMAND:
+                content = text;
+                desc = "command";
             case KEYWORD:
                 content = text;
                 desc = "keyword";
@@ -116,8 +131,8 @@ namespace current {
                 desc = "identifier";
                 break;
             case END:
-                content = "EOF";
-                desc = "end of line";
+                content = "end";
+                desc = "end of input";
                 break;
             default: 
                 content = "?";
@@ -280,6 +295,11 @@ namespace {
 
             if (std::find(KEYWORDS.begin(), KEYWORDS.end(), current::text) != std::end(KEYWORDS)) {
                 current::kind = KEYWORD;
+                return;
+            }
+
+            if (std::find(COMMANDS.begin(), COMMANDS.end(), current::text) != std::end(COMMANDS)) {
+                current::kind = COMMAND;
                 return;
             }
 

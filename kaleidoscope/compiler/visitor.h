@@ -14,6 +14,7 @@ namespace ast {
     class Block;
     class Assignment;
     class With;
+    class Command;
 }
 
 class Visitor {
@@ -43,4 +44,6 @@ public:
     virtual void visit_assignment(ast::Assignment&) = 0;
 
     virtual void visit_with(ast::With&) = 0;
+
+    virtual void visit_command(ast::Command&) = 0;
 };

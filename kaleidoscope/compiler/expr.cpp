@@ -138,8 +138,9 @@ namespace {
         and capitals for named subexpressions.
         'SKIP' refers to places where newlines are allowed.
 
-        Statement ::= Import | Def | Extern | Expr
+        Statement ::= Command | Import | Def | Extern | Expr
 
+        Command ::= command
         Import ::= 'import' identifier
         Def ::= 'def' Proto SKIP Expr
         Extern ::= 'extern' Proto 
@@ -159,6 +160,7 @@ namespace {
         Num ::= number
     */
 
+    std::unique_ptr<ast::Command> parse_command();
     std::unique_ptr<ast::Fn> parse_top_level_expr();
     std::unique_ptr<ast::Import> parse_import();
     std::unique_ptr<ast::Fn> parse_def();
@@ -172,7 +174,9 @@ namespace {
         try {
             std::unique_ptr<ast::Statement> result = nullptr;
 
-            if (tokens::current::is_keyword("import"))
+            if (tokens::current::is(tokens::COMMAND))
+                result = parse_command();
+            else if (tokens::current::is_keyword("import"))
                 result = parse_import();
             else if (tokens::current::is_keyword("def")) 
                 result = parse_def();
@@ -186,6 +190,14 @@ namespace {
             util::rethrow(__func__);
             return nullptr;
         }
+    }
+
+    std::unique_ptr<ast::Command> parse_command() {
+        if (!tokens::current::is(tokens::COMMAND))
+            util::init_throw(__func__, "Attempted to parse statement that was not a command, as a command.");
+        std::string content = tokens::current::text;
+        tokens::next(); // Move past the command.
+        return std::make_unique<ast::Command>(std::move(content));
     }
 
     std::unique_ptr<ast::Import> parse_import() {

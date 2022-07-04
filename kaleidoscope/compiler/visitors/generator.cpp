@@ -437,6 +437,10 @@ namespace gen {
                 util::init_throw(__func__, "Internal error: attempted to generate IR for an import statement!");
             }
 
+            void visit_command(ast::Command& target) override {
+                util::init_throw(__func__, "Internal error: attempted to generate IR for a command!");
+            }
+
             void visit_block(ast::Block& target) override {
                 for (const std::unique_ptr<ast::Statement>& statement: target.statements) {
                     statement->visit(*this);
