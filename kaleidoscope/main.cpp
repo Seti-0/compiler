@@ -26,7 +26,6 @@
 #endif
 
 // TODO: Refactor tokens and expressions, maybe move from globals to args & returns.
-// Make a simple 'compile' command.
 
 int main() {
     //tokens::debug = true;

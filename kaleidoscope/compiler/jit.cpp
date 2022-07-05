@@ -107,9 +107,7 @@ namespace jit {
             return std::move(error);
 
         llvm::InitializeNativeTarget();
-        llvm::InitializeNativeTargetAsmParser();
         llvm::InitializeNativeTargetAsmPrinter();
-        llvm::InitializeNativeTargetDisassembler();
 
         auto control = llvm::orc::SelfExecutorProcessControl::Create();
         if (!control)
@@ -381,18 +379,16 @@ namespace jit {
         if (!target)
             return llvm::make_error<llvm::StringError>(ERROR_CODE, error);
 
-        std::string cpu = "generic";
+        std::string cpu = "";
         std::string features = "";
         llvm::TargetOptions options;
         auto model = llvm::Optional<llvm::Reloc::Model>();
         llvm::TargetMachine* machine = target->createTargetMachine(triple_text, cpu, features, options, model);
 
-        // TODO: The data layout here isn't working, I don't know why.
-        // The one created for the JIT works, but that's a stopgap measure.
-        //const llvm::Triple* triple = &machine->getTargetTriple();
-        //const llvm::DataLayout* layout = &machine->createDataLayout();
+        const llvm::Triple& machine_triple = machine->getTargetTriple();
+        const llvm::DataLayout machine_layout = machine->createDataLayout();
 
-        gen::Generator generator(&*layout, triple);
+        gen::Generator generator(&machine_layout, &machine_triple);
         try {
             for (const std::shared_ptr<ast::Block>& block: blocks) {
                 block->visit(generator);
