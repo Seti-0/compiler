@@ -2,7 +2,7 @@
 # Building LLVM Locally #
 #########################
 
-The CMake file in this project assumes that llvm-config is on the PATH, describing and llvm build.
+The CMake file in this project assumes that llvm-config is on the PATH, describing an llvm build.
 
 Steps taken:
  > Cloned https://github.com/llvm/llvm-project to "C:/frep/llvm/llvm-project".
@@ -10,9 +10,9 @@ Steps taken:
  > Created directory "C:/frep/llvm/build".
  > From the newly created directory, ran cmake command: 
    cmake -G"Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DLLVM_BUILD_TOOLS=OFF -DLLVM_TARGETS_TO_BUILD="X86;WebAssembly" -DLLVM_INSTALL_TOOLCHAIN_ONLY=ON ../llvm-project/llvm
- > Opened resuling solution at "C:/frep/llvm/build/LLVM.sln".
+ > Opened resulting solution at "C:/frep/llvm/build/LLVM.sln".
  > Built the ALL_TARGETS project on Release and Debug.
- > Built the tools/llvm-config project on Release and Debug.
+ > Built the 'tools/llvm-config' project on Release and Debug.
  > Added the Debug bin folder (with llvm-config.exe) to the system path.
 
 That's all, after that it's to the CMake file in the user project, which uses llvm-config to work out paths and such.
@@ -25,6 +25,7 @@ Some notes:
  - So far, I can't figure out how to use the release build with a debug version of my project, and vice-versa. Hence building both above.
  - I'm not convinced the -DMAKE_BUILD_TYPE or -DLLVM_INSTALL_TOOLCHAIN_ONLY arguments do anything. The -DLLVM_BUILD_TOOLS and -DLLVM_TARGETS_TO_BUILD are very important though, building all the tools and targets adds considerably to the time to compile.
  - Apparently building in the source dir is not supported, hence separating the repo and the build folder.
+ - For the sake of VS Code intellisense, add  "C:/frep/llvm/llvm-project/llvm/include/**" and "C:/frep/llvm/build/include/**" to the "includePath" array config entry for the C++ plugin.
 
 Some documentation on all this:
 https://www.llvm.org/docs/CMake.html
