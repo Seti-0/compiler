@@ -65,8 +65,8 @@ std::array<std::string, 11> KEYWORDS = {
     "for", "with", "in",
     "unary", "binary"
 };
-std::array<std::string, 1> COMMANDS = {
-    "compile"
+std::array<std::string, 2> COMMANDS = {
+    "compile", "exit"
 };
 
 // Main entry point to tokenization.

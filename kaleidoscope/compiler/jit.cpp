@@ -21,6 +21,7 @@
 #pragma warning(pop)
 
 #include <memory>
+#include <stdlib.h>
 
 #include "gen.cpp"
 #include "imports.cpp"
@@ -227,6 +228,10 @@ namespace jit {
                     if (command->text == "compile") {
                         if (auto error = compile_to_obj_file()) 
                             return std::move(error);
+                    }
+                    else if (command->text == "exit") {
+                        printf("Goodbye!\n");
+                        std::exit(0);
                     }
                     else {
                         util::init_throw(__func__, "Command not implemented: '" + command->text + "'");
