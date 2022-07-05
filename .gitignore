@@ -1,5 +1,6 @@
 # Build output.
 *.exe
+*.o
 build/
 
 # File for misc experiments.
@@ -7,10 +8,3 @@ test.cpp
 
 # VSCode config.
 .vscode/
-
-# Include headers for intellisense.
-llvm/
-llvm-c/
-
-# Program output.
-output.o
