@@ -1,3 +1,6 @@
+The projects in this repo are to be based off LLVM as of writing this, which took me a while to figure out how to install.
+Mainly because the build time for it is multiple hours, and I didn't have any luck with prebuilt binaries on Windows.
+
 #########################
 # Building LLVM Locally #
 #########################

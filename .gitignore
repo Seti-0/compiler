@@ -3,8 +3,9 @@
 *.o
 build/
 
-# File for misc experiments.
+# Files for misc experiments.
 test.cpp
+exp.cpp
 
 # VSCode config.
 .vscode/
