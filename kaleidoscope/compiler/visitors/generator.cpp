@@ -510,7 +510,7 @@ namespace gen {
                     util::init_throw(__func__, "Unrecognized variable name: '" + target.identifier + "'");
                 
                 try {
-                    target.visit(*this);
+                    target.value->visit(*this);
                 }
                 catch (...) {
                     util::rethrow(__func__);

@@ -65,8 +65,8 @@ std::array<std::string, 11> KEYWORDS = {
     "for", "with", "in",
     "unary", "binary"
 };
-std::array<std::string, 2> COMMANDS = {
-    "compile", "exit"
+std::array<std::string, 4> COMMANDS = {
+    "compile", "exit", "toggle", "help"
 };
 
 // Main entry point to tokenization.
@@ -224,7 +224,7 @@ void next() {
         read_token();
 
     if (debug) 
-        printf("%s\n", current::describe().c_str());
+        printf("Token: %s\n", current::describe().c_str());
 }
 
 // Move past any newlines, if currently on a newline.
@@ -300,6 +300,12 @@ namespace {
 
             if (std::find(COMMANDS.begin(), COMMANDS.end(), current::text) != std::end(COMMANDS)) {
                 current::kind = COMMAND;
+
+                while (stream->peek() != '\n') {
+                    current::text += stream->peek();
+                    stream->get();
+                }
+
                 return;
             }
 

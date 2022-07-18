@@ -28,6 +28,8 @@
 //#endif
 //
 // This is no longer relevant though, since it seems to be fixed in newer version of the c++ toolset.
+// (Note - it's LLVM that needs to be built with the new toolset, so if I have to revert that for whatever reason
+// this becomes a problem again.)
 //
 // More info: https://github.com/conan-io/conan-center-index/issues/4826
 // Also: https://developercommunity.visualstudio.com/t/-imp-std-init-once-complete-unresolved-external-sy/1684365#T-N10041864
@@ -37,9 +39,6 @@
 // TODO: Refactor tokens and expressions, maybe move from globals to args & returns.
 
 int main() {
-    //tokens::debug = true;
-    expr::debug = true;
-    gen::debug = true;
     jit::debug = true;
     jit::init();
     builtins::init();

@@ -42,27 +42,13 @@ namespace jit {
     }
 
     llvm::Error interactive() {
-        printf("IR Generation\n");
+        printf("JIT Compilation\n");
         printf("\n");
-        printf("Simple Examples:\n");
-        printf(" -> 2 + 2\t\t\t(anonymous fn and collasped const)\n");
-        printf(" -> extern sin(x); sin(1)\t(externally defined function)\n");
-        printf(" -> def f()1; def f()2; f()\t(redefining functions)\n");
-        printf(" -> if 1 then 2 else 3\t(control flow)\n");
+        printf("For a demo, use 'import pre', 'import mandel', and then 'demo()'\n");
+        printf("'help' can be used to display info about the language.'\n");
+        printf("'toggle ir', 'toggle expressions', and 'toggle tokens' can be used to display more detail when evaluating things.\n");
         printf("\n");
-        printf("Extern and Printing:\n");
-        printf(" -> extern cos(x); def f(x)sin(x)*sin(x)+cos(x)*cos(x); f(235)\n");
-        printf(" -> (for i=0, i<10 in printc(65+i)) + printc(10)\n");
-        printf(" -> def f(x) if x then 65 else 90; printc(f(0)) + printc(10)\n");
-        printf("\n");
-        printf("Operators:\n");
-        printf(" -> def binary:1(x y) 0\n");
-        printf(" -> def binary~10(a b) a*10 + b\n");
-        printf(" -> def unary!(n)if n < 2 then 1 else n*!(n-1)\n");
-        printf("\n");
-
-        expr::debug = true;
-        gen::debug = true;
+        
         debug = true;
 
         if (auto error = init())
@@ -75,6 +61,43 @@ namespace jit {
         }
 
         return llvm::Error::success();
+    }
+
+    void display_help() {
+
+        printf("\n");
+        printf("Simple expressions\n");
+        printf(" -> 2 + 2\n");
+        printf(" -> 2*(3 > 2) # This is a comment\n");
+        printf("\n");
+
+        printf("Semi-colons or newlines separate top-level statements.\n");
+        printf("Newlines are ignored when an expression is unfinished.\n");
+        printf("\n");
+
+        printf("'import pre' defines some simple utilities, including 'printc'.\n");
+        printf(" -> printc(65) + printc(10)  # prints 'A'\n'");
+        printf("\n");
+
+        printf("Function definitions\n");
+        printf(" -> def f(a b) a + b\n");
+        printf(" -> extern sin()\n");
+        printf("\n");
+
+        printf("Control flow\n");
+        printf(" -> for i=0, i<10, 2 in printc(65+i)\n");
+        printf(" -> if 42 then printc(89) + printc(10) else printc(78) + printc(10)\n");
+        printf("\n");
+
+        printf("Variables\n");
+        printf(" -> with a=65 in printc(a)\n");
+        printf(" -> with a=0 in a = a + 10\n");
+        printf("\n");
+
+        printf("User operators\n");
+        printf(" -> def unary-(x) 0-x\n");
+        printf(" -> def binary:1(a b) 0\n");
+        printf("\n");
     }
 
     namespace {
@@ -159,6 +182,8 @@ namespace jit {
             return;
         }
 
+        printf("Importing '%s'. Source: \n%s\n", key.c_str(), (*builtins::map[key]).c_str());
+
         std::istringstream stream(*builtins::map[key]);
         tokens::set_input(stream);
         expr::interactive_mode = false;
@@ -168,6 +193,8 @@ namespace jit {
         
         tokens::set_input(std::cin);
         expr::interactive_mode = true;
+
+        printf("\n");
     }
 
     llvm::Error compile(ast::Item& item, llvm::orc::ResourceTrackerSP tracker);
@@ -225,7 +252,10 @@ namespace jit {
                     execute_builtin(import->file);
                 }
                 else if (ast::Command* command = statement->as_command()) {
-                    if (command->text == "compile") {
+                    if (command->text == "help") {
+                        display_help();
+                    }
+                    else if (command->text == "compile") {
                         if (auto error = compile_to_obj_file()) 
                             return std::move(error);
                     }
@@ -233,8 +263,41 @@ namespace jit {
                         printf("Goodbye!\n");
                         std::exit(0);
                     }
+                    else if (command->text == "toggle ir")  {
+                        if (gen::debug) {
+                            gen::debug = false;
+                            printf("IR display disabled.\n");
+                        }
+                        else {
+                            gen::debug = true;
+                            printf("IR display enabled.\n");
+                        }
+                        return nullptr;
+                    }
+                    else if (command->text == "toggle expressions") {
+                        if (expr::debug) {
+                            expr::debug = false;
+                            printf("Expressions display disabled.\n");
+                        }
+                        else {
+                            expr::debug = true;
+                            printf("Expressions display enabled.\n");
+                        }
+                        return nullptr;
+                    }
+                    else if (command->text == "toggle tokens") {
+                        if (expr::debug) {
+                            tokens::debug = false;
+                            printf("Tokens display disabled.\n");
+                        }
+                        else {
+                            tokens::debug = true;
+                            printf("Tokens display enabled.\n");
+                        }
+                        return nullptr;
+                    }
                     else {
-                        util::init_throw(__func__, "Command not implemented: '" + command->text + "'");
+                        printf("Command not implemented: '%s'\n", command->text.c_str());
                     }
                 }
             }
