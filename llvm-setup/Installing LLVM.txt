@@ -1,0 +1,84 @@
+The projects in this repo are to be based off LLVM as of writing this.
+They use CMake, and assume that there is a valid "llvm-config" command on the PATH that points towards an LLVM build. It seems the LLVM build config (Release/Debug) has to match to build config of the project using, as far as I can tell. So both Release and LLVM builds are needed.
+
+LLVM took me a while to figure out how to install - the build time is multiple hours, and I didn't have any luck with prebuilt binaries on Windows.
+
+#########################
+# Building LLVM Locally #
+#########################
+
+This assumes Windows, and takes C:/frep as the parent folder. That folder name is quite odd of course, but it can be replaced with whatever.
+
+Clone https://github.com/llvm/llvm-project to "C:/frep/llvm/llvm-project".
+Check out the branch 'release/14.x'.
+
+Create the directory "C:/frep/llvm/build".
+In this newly created directory, run: 
+cmake -G"Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DLLVM_BUILD_TOOLS=OFF -DLLVM_TARGETS_TO_BUILD="X86;WebAssembly" -DLLVM_INSTALL_TOOLCHAIN_ONLY=ON ../llvm-project/llvm
+
+There will be a solution at "C:/frep/llvm/build/LLVM.sln".
+Open it. Build the ALL_TARGETS project on *both* Release and Debug.
+This step takes hours! The Release build is quicker.
+Build the "tools/llvm-config" project on Release and Debug. This is very quick.
+
+Add the llvm/build/Debug/bin (or Release/bin) folder to the system path. 
+   
+That's all, after that it's to the CMake file in the projectusing llvm, which uses llvm-config to work out paths and such.
+
+#########
+# Notes #
+#########
+
+The CMake command above limits the targets to X86 and WASM, and disable the building of tools. A full Debug LLVM build is 50GB+, I was trying to avoid that. The Release build is much smaller.
+
+Running the cmake command takes minutes and shows "not found" messages. That's fine.
+
+I'm not convinced the -DMAKE_BUILD_TYPE or -DLLVM_INSTALL_TOOLCHAIN_ONLY arguments do anything.
+
+Both builds put a ton of stuff in the bin folder other than llvm-config. I don't know if any of that is useful.
+
+The CMake command generates some header files. Hence, when adding include paths for intellisense purposes there are two locations:
+  - "C:/frep/llvm/llvm-project/llvm/include/**"
+  - "C:/frep/llvm/build/include/**"
+In VSCode, these are added to the "includePath" array of the C++ plugin config.
+
+Some documentation on all this:
+https://www.llvm.org/docs/CMake.html
+https://www.llvm.org/docs/BuildingADistribution.html
+https://www.llvm.org/docs/GettingStarted.html
+
+#############################
+# NOTES ON CMAKE PARAMETERS #
+#############################
+
+Note that the defaults for certain cmake arguments aren't suitable for users. I changed the following in the command above:
+
+ - CMAKE_BUILD_TYPE=Release (No debug symbols, optimized)
+ - LLVM_BUILD_TOOLS=OFF (Make files for the tools are still generated)
+ - LLVM_TARGETS_TO_BUILD="X86;WebAssembly"
+ - LLVM_INSTALL_TOOLCHAIN_ONLY=ON (Removes dev tools from the list)
+ 
+CMAKE_BUILD_TYPE and LLVM_INSTALL_TOOLCHAIN_ONLY might not have actually done anything.
+The other two were definitely helpful.
+ 
+There are other ones of interest I didn't change. For example, dynamically linking LLVM from tools:
+(Not sure this is needed given that I'm not building the tools other than llvm-config, which is tiny)
+
+ - LLVM_BUILD_LLVM_DYLIB=ON
+ - LLVM_LINK_LLVM_DYLIB=ON
+ - LLVM_DYLIB_COMPONENTS=Native;WebAssembly 
+ 
+ (the input to the last one is a bit odd, see: https://www.llvm.org/docs/BuildingADistribution.html#relevant-cmake-options)
+
+Others:
+ - LLVM_ENABLE_BINDINGS (Related to OCaml and Go)
+ - LLVM_ENABLE_EH (Needed to propagate exceptions through LLVM code. Not sure when that would be needed, but worth remembering that it is NOT on by default)
+ - LLVM_ENABLE_RTTI (off by default)
+ - LLVM_COMPILER_WARNINGS (defaults to on, might be the source of some annoying stuff...)
+ - LLVM_EXTERNAL_PROJECTS  (?!! ! ??!?)
+ - LLVM_INCLUDE_(BENCHMARKS/EXAMPLES/TESTS/TOOLS)
+ - LLVM_TARGET_ARCH (useful for cross compiling)
+ - LLVM_ENABLE_(PROJECTS/RUNTIMES)=clang;etc... (used for building other things along with llvm. If llvm is the only thing of interest, this can be ignored.)
+  
+
+  
