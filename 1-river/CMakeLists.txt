@@ -5,31 +5,29 @@
 # PATH, pointing to a valid llvm build somewhere on the
 # system.
 
-cmake_minimum_required(VERSION 3.13.4)
-project(Iter0)
+# This cmake version is just the one I happened to have, older versions *might* work.
+cmake_minimum_required(VERSION 3.23.0)
+project(river)
 
 ################
 # Project Code #
 ################
 
-add_executable(Iter0 main.cpp)
+add_executable(river main.cpp)
 
 ################################
 # C++ Compiler Arguments/Flags #
 ################################
 
-# TODO: I think most of these flags are not 
-# useful here, it might only be the include folders
-# that are needed.
-
 execute_process(COMMAND llvm-config --cxxflags OUTPUT_VARIABLE CXX_FLAGS)
 separate_arguments(CXX_FLAGS NATIVE_COMMAND ${CXX_FLAGS})
-list(REMOVE_ITEM CXX_FLAGS "/GR-" "/EHs-c-")
+
+# Note - I am changing some of the flags given by llvm-config here.
+list(REMOVE_ITEM CXX_FLAGS "/GR-" "/EHs-c-" "-std:c++14")
+list(APPEND CXX_FLAGS "-std:c++20")
+
 message("\nC++ Flags: ${CXX_FLAGS}\n")
 add_definitions(${CXX_FLAGS})
-
-# TODO: What doe sthis do again lol?
-add_compile_options("-Wargument")
 
 ####################
 # Linked Libraries #
@@ -40,4 +38,4 @@ string(STRIP ${LLVM_LIBRARIES} LLVM_LIBRARIES)
 string(REPLACE "\\" "/" LLVM_LIBRARIES ${LLVM_LIBRARIES})
 separate_arguments(LLVM_LIBRARIES)
 message(STATUS "\nFound libraries: ${LLVM_LIBRARIES}\n\n")
-target_link_libraries(Iter0 ${LLVM_LIBRARIES})
+target_link_libraries(river ${LLVM_LIBRARIES})
