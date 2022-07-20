@@ -1,7 +1,12 @@
-# This cmake file is adapted from: 
+# This cmake file is adapted from:
 # https://www.llvm.org/docs/CMake.html#embedding-llvm-in-your-project
 
-cmake_minimum_required(VERSION 3.13.4)
+# This file assumes llvm-config.exe is on the system 
+# PATH, pointing to a valid llvm build somewhere on the
+# system.
+
+# This cmake version is just the one I happened to have, older versions *might* work.
+cmake_minimum_required(VERSION 3.23.0)
 project(X)
 
 ################
@@ -14,16 +19,15 @@ add_executable(X main.cpp)
 # C++ Compiler Arguments/Flags #
 ################################
 
-# I'm not sure this section is needed or even helpful.
-# TODO: Look through the flags one by one and see if any make sense to apply here.
-
 execute_process(COMMAND llvm-config --cxxflags OUTPUT_VARIABLE CXX_FLAGS)
 separate_arguments(CXX_FLAGS NATIVE_COMMAND ${CXX_FLAGS})
-list(REMOVE_ITEM CXX_FLAGS "/GR-" "/EHs-c-")
+
+# Note - I am changing some of the flags given by llvm-config here.
+list(REMOVE_ITEM CXX_FLAGS "/GR-" "/EHs-c-" "-std:c++14")
+list(APPEND CXX_FLAGS "-std:c++20")
+
 message("\nC++ Flags: ${CXX_FLAGS}\n")
 add_definitions(${CXX_FLAGS})
-
-add_compile_options("-Wargument")
 
 ####################
 # Linked Libraries #
@@ -33,18 +37,5 @@ execute_process(COMMAND llvm-config --libs support core passes irreader orcjit n
 string(STRIP ${LLVM_LIBRARIES} LLVM_LIBRARIES)
 string(REPLACE "\\" "/" LLVM_LIBRARIES ${LLVM_LIBRARIES})
 separate_arguments(LLVM_LIBRARIES)
-target_link_libraries(X ${LLVM_LIBRARIES})
 message(STATUS "\nFound libraries: ${LLVM_LIBRARIES}\n\n")
-
-#########
-# Notes #
-#########
-
-# This file assumes that there is llvm-config.exe somewhere on the system path.
-# It is there that it gets information on include file locations, linked library locations,
-# and c++ compiler flags.
-
-# The output from llvm config is space separated, the "separate_arguments" changes this to
-# semi-colon separation. semi-colon separated values are lists in cmake.
-
-# llvm-config yields backslash based paths, cmake expects forward-slash based ones.
+target_link_libraries(X ${LLVM_LIBRARIES})

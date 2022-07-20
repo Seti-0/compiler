@@ -1,2 +1,8 @@
 @echo off
-.\build\Debug\X.exe
+setlocal
+
+if "%1" == "release" (
+    .\build\Debug\river.exe
+) else (
+    .\build\Release\river.exe
+)

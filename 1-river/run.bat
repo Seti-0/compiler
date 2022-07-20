@@ -1,1 +1,8 @@
-C:\rep\compiler\iteration-0\build\Debug\Iter0.exe
+@echo off
+setlocal
+
+if "%1" == "release" (
+    .\build\Debug\river.exe
+) else (
+    .\build\Release\river.exe
+)

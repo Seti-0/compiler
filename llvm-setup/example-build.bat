@@ -1,7 +1,14 @@
 @echo off
-cmake -S. -B./build | exit /b
-cmake --build ./build
+setlocal
 
-:: For release builds, use cmake --build ./build --config Release
-:: Before doing so, make sure the release mode 'llvm-config' is on the PATH, not the debug mode one.
-:: Also, delete the folder and run cmake -S. -B./build first, to get rid of links to the debug mode stuff.
+if "%1" == "release" (
+    set "FOLDER=Release"
+    set "ARG=--config Release"
+) else (
+    set "FOLDER=Debug"
+    set "ARG="
+)
+set "PATH=C:\frep\llvm\build\%FOLDER%\bin;%PATH%"
+
+cmake -S. -B./build
+cmake --build ./build %ARG%
