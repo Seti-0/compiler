@@ -1,0 +1,19 @@
+def fib(n) {
+    if n < 2 {
+        return 1
+    }
+
+    a = 1; b = 1;
+    c = 2;
+    for i in 0..n {
+        c = (a + b)
+        a = b
+        b = c
+    }
+
+    return c
+}
+
+for i in 1..10 {
+    printd(fib(i))
+}

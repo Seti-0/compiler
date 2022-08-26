@@ -1,0 +1,38 @@
+###########
+# Externs #
+###########
+
+extern sin(x)
+extern pi()
+extern test(x, y)
+
+###########
+# Imports #
+###########
+
+include 'eg-call.river'
+
+#############
+# Functions #
+#############
+
+def f() {}
+
+def g() {
+    printc('g')
+    printc('\n')
+    return 1
+}
+
+def identity(a) {
+    return a
+}
+
+def sum_3(a, b, c) {
+    return b
+}
+
+f()
+printd(g())
+printc(identity('A'))
+printd(sum_3(1, 2, 3))

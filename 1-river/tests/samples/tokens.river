@@ -1,0 +1,79 @@
+#########
+# Intro #
+#########
+
+# This isn't a valid River source file, it's just
+# for checking the tokenizer.
+
+###############
+# Identifiers #
+###############
+
+bingo bango bingo_bango _bingo
+
+#############
+# Operators #
+#############
+
+# In future, '<>=' should probably indicate one
+# (invalid) operator instead of '<' followed by '>='
+
++-*/ ** == != < >= > <= and or
++-*/ ** == !=<>=><= and or
+
+############
+# Keywords #
+############
+
+extern def include return if else for in step
+
+###############
+# Key symbols #
+###############
+
+(),;=..
+
+###########
+# Numbers #
+###########
+
+.05 -2.3 78 96.023 
+
+xstep = .05
+xstart = -2.3
+xend = xstart + xstep*78
+y = 96.023
+
+##########
+# Ranges #
+##########
+
+# (The three dots thing is evil)
+
+1..10
+.03...04
+a..b
+
+########
+# MISC #
+########
+
+include example
+extern example(a, b);
+
+def fib(n) {
+    if n < 2 {
+        return 1
+    }
+    else {
+        a = 1; b = 1;
+        c = 2;
+        for i in 0..n {
+            c = (a + b)
+            a = b
+            b = c
+        }
+
+        return c
+    }
+}

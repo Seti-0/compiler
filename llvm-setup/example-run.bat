@@ -2,7 +2,7 @@
 setlocal
 
 if "%1" == "release" (
-    .\build\Debug\river.exe
-) else (
     .\build\Release\river.exe
+) else (
+    .\build\Debug\river.exe
 )

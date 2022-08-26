@@ -1,0 +1,23 @@
+#############
+# Top Level #
+#############
+
+x = 3
+printd(x)
+
+y = x + 7
+printd(y)
+
+##################
+# Function Scope #
+##################
+
+def f(x) {
+    printd(x)
+}
+f()
+
+def g() {
+    x = 4
+    printd(x)
+}

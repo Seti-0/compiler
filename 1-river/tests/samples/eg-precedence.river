@@ -1,0 +1,78 @@
+##############
+# Precedence #
+##############
+
+### Multiplication (Precedence)
+
+# Expect 2, not 4
+printd(1 + 1*2)
+
+# Expect 8, not 16
+printd(2*2 + 2*2)
+
+### Subtraction (Associativity)
+
+# Expect -4, not 0
+printd(1 - 2 - 3)
+
+### Subtraction (Precedence)
+
+# Expect -2, not -4 or 0
+printd(1 - 2 + 1 - 2)
+
+# Expect -13, not -7
+printd(1 - 2*7)
+
+### Division (Associativity)
+
+# Expect 1/2, not 1
+printd(2/2/2)
+
+### Division (Precedence)
+
+# Expect 2, not 1.5
+printd(1+2/2)
+
+# Expect 0, not -0.5
+printd(1 - 2/2)
+
+##########
+# Groups #
+##########
+
+# Expect 1
+printd((1))
+
+### Multiplication (Precedence)
+
+# Expect 4
+printd((1 + 1)*2)
+
+# Expect 16
+printd(2*(2 + 2)*2)
+
+### Subtraction (Associativity)
+
+# Expect 2
+printd(1 - (2 - 3))
+
+### Subtraction (Precedence)
+
+# Expect 0
+printd(1 - ((2 + 1) - 2))
+
+# Expect -7
+printd((1 - 2)*7)
+
+### Division (Associativity)
+
+# Expect 2
+printd(2/(2/2))
+
+### Division (Precedence)
+
+# Expect 1.5
+printd((1+2)/2)
+
+# Expect -0.5
+printd((1 - 2)/2)

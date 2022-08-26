@@ -1,0 +1,13 @@
+#########
+# Calls #
+#########
+
+# Single argument.
+printd(42)
+
+# Subsequent statements.
+printc('A')
+printc('B')
+
+# Multi-argument.
+printc('A', 'B')

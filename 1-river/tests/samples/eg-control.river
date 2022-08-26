@@ -1,0 +1,32 @@
+#############
+# For Loops #
+#############
+
+for i in 1..10 {
+    printd(i)
+}
+
+for i in 1..10 step 2 {
+    printd(i)
+}
+
+#################
+# If Statements #
+#################
+
+if true {
+    #etc
+}
+
+if x > 4 {
+    printc('A')
+    printc('B')
+    printc('C')
+}
+
+if x > 4 {
+    printc('Y')
+}
+else {
+    printc('N')
+}

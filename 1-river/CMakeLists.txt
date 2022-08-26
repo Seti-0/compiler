@@ -14,6 +14,7 @@ project(river)
 ################
 
 add_executable(river main.cpp)
+add_executable("test-tokens" "tests/test-tokens.cpp")
 
 ################################
 # C++ Compiler Arguments/Flags #
