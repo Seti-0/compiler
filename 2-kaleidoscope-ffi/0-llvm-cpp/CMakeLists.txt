@@ -8,7 +8,13 @@ project(Kaleidoscope)
 # Project Code #
 ################
 
-add_library(LLVM_Wrapper SHARED "0-llvm-wrapper/example.cpp")
+add_library(
+    LLVM_Wrapper SHARED 
+    "0-llvm-wrapper/example.cpp"
+    "0-llvm-wrapper/ir-gen.cpp"
+    "0-llvm-wrapper/misc.cpp"
+)
+
 add_executable(Kaleidoscope main.cpp)
 
 install(TARGETS LLVM_Wrapper DESTINATION ".")

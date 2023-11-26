@@ -10,7 +10,6 @@
 
 // LLVM generates lots of warnings I can't do anything about.
 #pragma warning(push, 0)        
-
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
@@ -23,8 +22,7 @@
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
-#include "llvm/Transforms/Utils.h"
-  
+#include "llvm/Transforms/Utils.h"  
 #pragma warning(pop)
 
 namespace gen {
@@ -135,7 +133,7 @@ namespace gen {
                         printf("WARNING: Generator context taken without module!\n");
                 }
                 else if (context)
-                        printf("WARNING: Generator module taken without context!");
+                    printf("WARNING: Generator module taken without context!");
             }
 
             bool has_result() {
