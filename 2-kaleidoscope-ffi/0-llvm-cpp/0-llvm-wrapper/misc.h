@@ -4,5 +4,6 @@
 #define API_FUNCTION extern "C" __declspec(dllexport)
 
 API_FUNCTION int LW_Getch();
+API_FUNCTION short LW_GetKeyState(int virtual_key);
 
 #endif

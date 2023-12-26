@@ -1,40 +1,83 @@
-use crate::ansi;
 use std::fmt;
+use logos::Logos;
 
-#[derive(Debug)]
-pub enum Expr {
-    Number(i32),
-    Op(Box<Expr>, OpKind, Box<Expr>)
+// ##########
+// # Tokens #
+// ##########
+
+#[derive(Logos, Clone, Debug, PartialEq)]
+pub enum Token {
+    #[token("var")]
+    KeywordVar,
+    #[token("print")]
+    KeywordPrint,
+
+    #[regex(r"[_a-zA-Z][_a-z0-9A-Z]*", |lex| lex.slice().parse())]
+    Identifier(String),
+    #[regex(r"\d+", |lex| lex.slice().parse())]
+    Integer(i64),
+
+    #[token("(")]
+    LParen,
+    #[token(")")]
+    RParen,
+    #[token("=")]
+    Assign,
+    #[token(";")]
+    Semicolon,
+  
+    #[token("+")]
+    OperatorAdd,
+    #[token("-")]
+    OperatorSub,
+    #[token("*")]
+    OperatorMul,
+    #[token("/")]
+    OperatorDiv,
+
+    #[regex(r"#.*\n?", logos::skip)]
+    #[regex(r"[ \t\n\f]+", logos::skip)]
+    #[error]
+    Error
 }
 
-#[derive(Debug)]
-pub enum OpKind {
-    Mul,
-    Div,
+impl fmt::Display for Token {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+// #######
+// # AST #
+// #######
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Statement {
+    Variable {
+        name: String,
+        value: Box<Expression>
+    },
+    Print {
+        value: Box<Expression>
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Expression {
+    Integer(i64),
+    Variable(String),
+    BinaryOperation {
+        lhs: Box<Expression>,
+        operator: Operator,
+        rhs: Box<Expression>
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Operator {
     Add,
     Sub,
+    Mul,
+    Div
 }
 
-impl fmt::Display for Expr {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Expr::Number(n) => write!(f, "{}{}{}", ansi::FG_RED, n, ansi::RESET),
-            Expr::Op(a, op, b) => write!(
-                f, "{} {} {}",
-                a.as_ref(), op, b.as_ref()
-            )
-        }
-    }
-}
-
-impl fmt::Display for OpKind {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let text = match self {
-            OpKind::Mul => "*",
-            OpKind::Div => "/",
-            OpKind::Add => "+",
-            OpKind::Sub => "-",
-        };
-        write!(f, "{}{}{}", ansi::FG_BLUE, text, ansi::RESET)
-    }
-}

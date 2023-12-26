@@ -1,120 +1,228 @@
 #![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
+#![allow(unreachable_code)]
 
-mod llvm_wrapper;
-
-use std::io::Write;
 
 use lalrpop_util::lalrpop_mod;
+use lexer::Lexer;
+use libc::getchar;
+use logos::Logos;
 
-pub mod ast;
-pub mod ansi;
+use std::fs;
+use std::io::Read;
+
+use crate::terminal::{
+    Input,
+    Terminal,
+    TermColor,
+    ColorScheme
+};
+use crate::llvm_wrapper::{
+    is_pressed,
+    ModifierKey
+};
+
+use crate::ui::{
+    CodeEditorModel,
+    CodeEditor,
+    CodeEditorMode
+};
+
+mod llvm_wrapper;
+mod ast;
+mod lexer;
+mod terminal;
+mod ui;
 
 lalrpop_mod!(pub grammar); // synthesized by LALRPOP
 
-#[test]
-fn calculator1() {
-    assert!(grammar::ExprParser::new().parse("22").is_ok());
-    assert!(grammar::ExprParser::new().parse("(22)").is_ok());
-    assert!(grammar::ExprParser::new().parse("((((22))))").is_ok());
-    assert!(grammar::ExprParser::new().parse("((22)").is_err());
+// ##################
+// # Editor Actions #
+// ##################
+
+/// Editor actions are called to respond to raw key presses in the terminal.
+/// They either act on the editor and consume the input (returning true) or reject
+/// the input and return false.
+type EditorAction = fn(Input, &mut CodeEditor) -> bool;
+
+/// Switch between command and edit modes when pressing ESC.
+fn mode_action(input: Input, editor: &mut CodeEditor) -> bool {
+    if matches!(input, Input::Escape) {
+        editor.toggle_mode();
+        return true;
+    }
+    return false;
 }
 
-struct Text {
-    text: String,
+/// Write the given character to the editor if it is a valid visible character.
+fn write_action(input: Input, editor: &mut CodeEditor) -> bool {
+    if let Input::Char(ch) = input {
+        // I'm being careful here since my editor model is fragile and assumes that any character
+        // which is not a newline takes up one glyph of visual space AND one byte.
+        // The range between SPACE (32) and TILDE (126) inclusive works well for that.
+        if (ch >= ' ' && ch <= '~') || (ch == '\n') {
+            editor.model.write(ch);
+            return true;
+        }
+    }
+    return false;
 }
 
-impl Text {
-    fn new() -> Text {
-        Text {
-            text: String::new()
+// Applies the affects of the BACKSPACE or DELETE keys, if the input is one of those.
+fn delete_action(input: Input, editor: &mut CodeEditor) -> bool {
+    if let Input::Backspace = input {
+        editor.model.delete();
+        return true;
+    }
+    else if let Input::Delete = input {
+        editor.model.delete_next();
+        return true;
+    }
+    return false;
+}
+
+/// If the given input is an arrow key, move the cursor.
+fn move_action(input: Input, editor: &mut CodeEditor) -> bool {
+    let (mut x, mut y) = editor.model.pos;
+    let mut x_limit = editor.model.x_limit_memory;
+
+    match input {
+        Input::Up => {
+            if y > 0 {
+                y -= 1;
+            }
+            x = x_limit;
+        },
+        Input::Down => {
+            y += 1;
+            x = x_limit;
+        },
+        Input::Left => {
+            if x > 0 {
+                x -= 1;
+                x_limit = x;
+            }
+        },
+        Input::Right => {
+            x += 1;
+            x_limit = x;
+        },
+        _ => {
+            return false;
         }
     }
 
-    fn write(&mut self, ch: char) {
-        self.text.push(ch);
-    }
-
-    fn get_text(&self) -> &str {
-        return &self.text;
-    }
-}
-
-// This is the "terminate program" signal from Ctrl-C in the terminal.
-const ASCII_EOT: u8 = 3;
-
-fn write_char(text: &mut Text, ch: char) {
-    text.write(ch);
-}
-
-fn write_newline(text: &mut Text) {
-    text.write('\n');
-}
-
-fn clear() {
-    print!("\x1b[2J");
-}
-
-fn flush() {
-    std::io::stdout().flush().expect("Unable to flush terminal output.");
-}
-
-fn set_cursor_pos(x: u64, y: u64) {
-    // See: https://en.wikipedia.org/wiki/ANSI_escape_code
-    // Note that the order is y then x here!
-    print!("\x1b[{};{}H", y, x);
-}
-
-fn get_cursor_pos() -> (u64, u64) {
-    // See: https://en.wikipedia.org/wiki/ANSI_escape_code
-    // ANSI escape code 'DSR', device status report.
-    // The new line is important too!
-    print!("\x1b[6n");
-    flush();
-
-    // The first two characters of the response should be:
-    //  - 27 'ESC'
-    //  - 91 '['
-    // An assert would be nice here.
-    unsafe {
-        llvm_wrapper::LW_Getch();
-        llvm_wrapper::LW_Getch();
-    }
-
-    // Next come X and Y as ASCII digits with a terminator.
-    // The terminator is different for each.
-    fn parse_coord(terminator: u8) -> u64 {
-        let mut bytes = vec![];
-        loop {
-            let i: i32;
-            unsafe {
-                i = llvm_wrapper::LW_Getch();
-            }
-    
-            let c = i.to_le_bytes()[0];
-            if c == terminator {
-                break;
-            }
-    
-            bytes.push(c);
-        }
-        let utf_str = String::from_utf8(bytes).expect("Failed to parse str for cursor X from ANSI DSR response.");
-        let result: u64 = utf_str.parse().expect("Failed to parse int for cursor X from ANSI DSR response.");
-        return result;
-    }
-
-    // Note that the Y coord comes first, then the X one.
-    // The terminator for the Y coord is ASCII 59, or ';'.
-    let y = parse_coord(59);
-
-    // The terminator for the X coord is ASCII 82, or 'R'.
-    let x = parse_coord(82);
-
-    return (x, y);
+    editor.model.pos = (x, y);
+    editor.model.x_limit_memory = x_limit;
+    return true;
 }
 
 fn main() {
-    let parser = grammar::ExprParser::new();
-    let result = parser.parse("2 + 3").unwrap();
+    let read_res = fs::OpenOptions::new()
+        .read(true)
+        .open("demo.via");
 
-    println!("{}", result);
+    let mut content = String::new();
+    match read_res {
+        Ok(mut file) => {
+            file.read_to_string(&mut content)
+                .expect("Failed to read from save file!");
+        },
+        Err(e) => {
+            // At some point a status message would be nice...
+        }
+    };
+
+    let actions = [
+        mode_action,
+        move_action,
+        write_action,
+        delete_action
+    ];
+
+    let mut editor = CodeEditor::new();
+    let mut term = Terminal::new();
+
+    editor.model.text = content;
+
+    term.update_terminal_size();
+    term.clear();
+    editor.draw(&mut term);
+    term.flush();
+
+    loop {
+        match terminal::get_input() {
+            Input::Exit => {
+                break;
+            }
+            other => {
+                for action in actions {
+                    if action(other, &mut editor) {
+                        break;
+                    } 
+                }
+
+                term.clear();
+                editor.draw(&mut term);
+                term.flush();
+            }
+        }
+    };
+
+    {
+        let write_res = fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open("demo.via")
+            .and_then(|mut file|{
+                use std::io::Write;
+                file.write_all(editor.model.get_content().as_bytes())
+            });
+
+        if let Err(error) = write_res {
+            // This is going to be an annoying one to implement eventually.
+            // Either just a "sorry, I'm noping out" message
+            // Or a dialog with retry.
+        }
+
+    }
+
+    term.clear();
+    term.set_cursor_pos(1, 1);
+    {
+        use std::fmt::Write;
+
+        write!(term, "{0}Goodbye!{1}\n", 
+            ColorScheme::fg(TermColor::Green), 
+            ColorScheme::reset()
+        ).expect("Failed to write to standard out.");
+    }
+    term.flush();
 }
+
+/*
+    let source = r#"
+        var a = 42;
+        var b = 23;
+
+        # a comment
+        print (a - b);
+    "#;
+
+    let lexer = Lexer::new(source);
+    let parser = grammar::ScriptParser::new();
+
+    let result = parser.parse(lexer);
+
+    println!("{:?}", result);
+
+    let mut logos = ast::Token::lexer(source);
+
+    let mut token = logos.next();
+    while token.is_some() {
+        println!("Token: {:?} Span: {:?} Slice: {:?}", token, logos.span(), logos.slice());
+        token = logos.next()
+    }
+*/
