@@ -1,124 +1,55 @@
+// This is a project where I'm experimenting a lot,
+// I don't want to have to worry about this kind of thing
+// while I'm doing so.
 #![allow(dead_code)]
 #![allow(unused_imports)]
 #![allow(unused_variables)]
 #![allow(unreachable_code)]
 
+// My naming convention is weird, I'm not
+// surprised our opinionated Rust isn't keen on it.
+mod compiler {
+    #[path="a-llvm_wrapper.rs"] pub mod llvm_wrapper;
+    #[path="b-ast.rs"] pub mod ast;
+    #[path="d-lexer.rs"] pub mod lexer;
+}
+mod editor {
+    #[path="a-extern.rs"] pub mod external;
+    #[path="b-colors.rs"] pub mod colors;
+    #[path="c-input.rs"] pub mod input;
+    #[path="d-terminal.rs"] pub mod terminal;
+    #[path="e-document.rs"] pub mod doc;
+    #[path="f-viewport.rs"] pub mod viewport;
+    #[path="g-state.rs"] pub mod state;
+    #[path="h-drawing.rs"] pub mod drawing;
+    #[path="i-actions.rs"] pub mod actions;
+    #[path="j-editor.rs"] pub mod editor;
+}
 
+/*
 use lalrpop_util::lalrpop_mod;
 use lexer::Lexer;
-use libc::getchar;
 use logos::Logos;
+*/
 
 use std::fs;
 use std::io::Read;
 
-use crate::terminal::{
-    Input,
-    Terminal,
-    TermColor,
-    ColorScheme
-};
-use crate::llvm_wrapper::{
-    is_pressed,
-    ModifierKey
-};
-
-use crate::ui::{
-    CodeEditorModel,
-    CodeEditor,
-    CodeEditorMode
+use crate::editor::{
+    external::{
+        ModifierKey,
+        is_pressed, 
+        copy_to_clipboard
+    },
+    colors::Color,
+    editor::CodeEditor
 };
 
-mod llvm_wrapper;
-mod ast;
-mod lexer;
-mod terminal;
-mod ui;
-
-lalrpop_mod!(pub grammar); // synthesized by LALRPOP
-
-// ##################
-// # Editor Actions #
-// ##################
-
-/// Editor actions are called to respond to raw key presses in the terminal.
-/// They either act on the editor and consume the input (returning true) or reject
-/// the input and return false.
-type EditorAction = fn(Input, &mut CodeEditor) -> bool;
-
-/// Switch between command and edit modes when pressing ESC.
-fn mode_action(input: Input, editor: &mut CodeEditor) -> bool {
-    if matches!(input, Input::Escape) {
-        editor.toggle_mode();
-        return true;
-    }
-    return false;
-}
-
-/// Write the given character to the editor if it is a valid visible character.
-fn write_action(input: Input, editor: &mut CodeEditor) -> bool {
-    if let Input::Char(ch) = input {
-        // I'm being careful here since my editor model is fragile and assumes that any character
-        // which is not a newline takes up one glyph of visual space AND one byte.
-        // The range between SPACE (32) and TILDE (126) inclusive works well for that.
-        if (ch >= ' ' && ch <= '~') || (ch == '\n') {
-            editor.model.write(ch);
-            return true;
-        }
-    }
-    return false;
-}
-
-// Applies the affects of the BACKSPACE or DELETE keys, if the input is one of those.
-fn delete_action(input: Input, editor: &mut CodeEditor) -> bool {
-    if let Input::Backspace = input {
-        editor.model.delete();
-        return true;
-    }
-    else if let Input::Delete = input {
-        editor.model.delete_next();
-        return true;
-    }
-    return false;
-}
-
-/// If the given input is an arrow key, move the cursor.
-fn move_action(input: Input, editor: &mut CodeEditor) -> bool {
-    let (mut x, mut y) = editor.model.pos;
-    let mut x_limit = editor.model.x_limit_memory;
-
-    match input {
-        Input::Up => {
-            if y > 0 {
-                y -= 1;
-            }
-            x = x_limit;
-        },
-        Input::Down => {
-            y += 1;
-            x = x_limit;
-        },
-        Input::Left => {
-            if x > 0 {
-                x -= 1;
-                x_limit = x;
-            }
-        },
-        Input::Right => {
-            x += 1;
-            x_limit = x;
-        },
-        _ => {
-            return false;
-        }
-    }
-
-    editor.model.pos = (x, y);
-    editor.model.x_limit_memory = x_limit;
-    return true;
-}
+//lalrpop_mod!(pub grammar); // synthesized by LALRPOP
 
 fn main() {
+    println!("{}Hello world!{}", Color::ExitMessage, Color::Reset);
+
     let read_res = fs::OpenOptions::new()
         .read(true)
         .open("demo.via");
@@ -134,41 +65,9 @@ fn main() {
         }
     };
 
-    let actions = [
-        mode_action,
-        move_action,
-        write_action,
-        delete_action
-    ];
-
     let mut editor = CodeEditor::new();
-    let mut term = Terminal::new();
-
-    editor.model.text = content;
-
-    term.update_terminal_size();
-    term.clear();
-    editor.draw(&mut term);
-    term.flush();
-
-    loop {
-        match terminal::get_input() {
-            Input::Exit => {
-                break;
-            }
-            other => {
-                for action in actions {
-                    if action(other, &mut editor) {
-                        break;
-                    } 
-                }
-
-                term.clear();
-                editor.draw(&mut term);
-                term.flush();
-            }
-        }
-    };
+    editor.set_content(content);
+    editor.run();
 
     {
         let write_res = fs::OpenOptions::new()
@@ -178,7 +77,7 @@ fn main() {
             .open("demo.via")
             .and_then(|mut file|{
                 use std::io::Write;
-                file.write_all(editor.model.get_content().as_bytes())
+                file.write_all(editor.get_content().as_bytes())
             });
 
         if let Err(error) = write_res {
@@ -188,18 +87,6 @@ fn main() {
         }
 
     }
-
-    term.clear();
-    term.set_cursor_pos(1, 1);
-    {
-        use std::fmt::Write;
-
-        write!(term, "{0}Goodbye!{1}\n", 
-            ColorScheme::fg(TermColor::Green), 
-            ColorScheme::reset()
-        ).expect("Failed to write to standard out.");
-    }
-    term.flush();
 }
 
 /*
