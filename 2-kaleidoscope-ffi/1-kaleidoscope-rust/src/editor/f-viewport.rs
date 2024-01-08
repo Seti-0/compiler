@@ -33,17 +33,13 @@ impl DocViewport {
         }
     }
 
-    pub fn temp_set_cursor(&mut self, pos: (usize, usize)) {
-        (self.cursor_x, self.cursor_y) = pos;
-    }
-
     pub fn set_size(&mut self, w: usize, h: usize) {
         self.w = w;
         self.h = h;
     }
 
     pub fn update(&mut self, doc: &Document) {
-        limit_cursor(self, doc);
+        (self.cursor_x, self.cursor_y) = doc.get_insertion_cursor_pos();
         limit_window_pos(self, doc);
     }
 
@@ -67,15 +63,25 @@ impl DocViewport {
 fn limit_window_pos(viewport: &mut DocViewport, doc: &Document) {
     let cursor_x = viewport.cursor_x;
     let cursor_y = viewport.cursor_y;
+
     let min_window_x = cursor_x - (viewport.w - 1.min(viewport.w)).min(cursor_x);
     let min_window_y = cursor_y - (viewport.h - 1.min(viewport.h)).min(cursor_y);
 
+    let content_w = doc.get_line_len(cursor_y);
+    let content_h = doc.get_line_count();
+    let mut max_window_x = content_w - viewport.w.min(content_w);
+    let mut max_window_y = content_h - viewport.h.min(content_h);
+    max_window_x = max_window_x.max(min_window_x).min(cursor_x);
+    max_window_y = max_window_y.max(min_window_y).min(cursor_y);
+
+
     let window_x = viewport.window_x;
     let window_y = viewport.window_y;
-    viewport.window_x = viewport.window_x.clamp(min_window_x, cursor_x - 1.min(cursor_x));
-    viewport.window_y = viewport.window_y.clamp(min_window_y, cursor_y - 1.min(cursor_y));
+    viewport.window_x = viewport.window_x.clamp(min_window_x, max_window_x);
+    viewport.window_y = viewport.window_y.clamp(min_window_y, max_window_y);
 }
 
+/*
 fn limit_cursor(viewport: &mut DocViewport, doc: &Document) {
     // The x-coordinate is easy, it's only bound by the line length.
     let line_len = doc.get_line_len(viewport.cursor_y);
@@ -102,3 +108,4 @@ fn limit_cursor(viewport: &mut DocViewport, doc: &Document) {
     let max_y = view_max.max(text_max + view_max);
     viewport.cursor_y = viewport.cursor_y.min(max_y);
 }
+*/

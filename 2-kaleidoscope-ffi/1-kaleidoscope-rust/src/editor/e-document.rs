@@ -28,10 +28,7 @@ use std::ops::{Range, RangeBounds};
 pub struct Document {
     pub insertion_index: usize,
     text: String,
-    pub desired_x: usize, // used by the action that moves the cursor.
-    // I should maybe make actions be objects with memory instead of having them intrude here.
-    // But this works fine for now.
-    len: usize,
+    desired_x: usize,
 }
 
 impl Document {
@@ -39,10 +36,9 @@ impl Document {
     /// no selection, and the cursor set to (0,0).
     pub fn new() -> Document {
         Document {
+            insertion_index: 0,
             text: String::new(),
-            len: 0,
-            desired_x: 0,
-            insertion_index: 0
+            desired_x: 0
         }
     }
 
@@ -50,7 +46,6 @@ impl Document {
     /// This updates the length and clears the selection.
     /// It does not reset or normalize the position!
     pub fn set_content(&mut self, content: String) {
-        self.len = content.chars().count();
         self.text = content;
     }
 
@@ -75,12 +70,6 @@ impl Document {
         };
     }
 
-    pub fn len(&self) -> usize {
-        // So... I'm still really confused on str.len() vs. str.chars().count()
-        // Currently I'm caching str.chars().count().
-        return self.len;
-    }
-
     /// Gets the insertion point as a (line, col) coordinate.
     pub fn get_insertion_cursor_pos(&self) -> (usize, usize) {
         return get_cursor(self, self.insertion_index);
@@ -95,27 +84,30 @@ impl Document {
     pub fn write(&mut self, ch: char) {
         self.check_insertion_index();
         self.text.insert(self.insertion_index, ch);
-        self.insertion_index += 1;
     }
 
     /// Deletes a number of characters from the current insertion point.
     pub fn delete(&mut self, count: usize) {
         self.check_insertion_index();
         
-        let a = self.insertion_index;
-        if a == self.text.len() {
-            return;
-        }
+        let i = self.insertion_index;
+        let DocRange{a, b} = DocRange::new(i, i + count).get_limited(self);
 
-        let b = (a + count).min(self.text.len());
-        self.text.replace_range(a..b, "");
-        self.insertion_index = a;
+        if a < self.len() {
+            self.text.replace_range(a..b, "");
+        }
     }
 
     /// A private function for limiting the public insertion index to the valid range.
     /// This is called by other methods before using the insertion index to edit text.
     fn check_insertion_index(&mut self) {
         self.insertion_index = self.insertion_index.min(self.text.len());
+    }
+
+    pub fn len(&self) -> usize {
+        // So... I'm still really confused on str.len() vs. str.chars().count()
+        // Which one should be used where?
+        return self.text.len();
     }
 
     /*

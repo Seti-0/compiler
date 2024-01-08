@@ -21,7 +21,8 @@ pub struct EditorState {
     exit_request: EditorExitRequest,
     pub doc: Document,
     selection: Option<DocRange>,
-    pub view: DocViewport
+    pub view: DocViewport,
+    status: EditorStatus
 }
 
 impl EditorState {
@@ -31,7 +32,8 @@ impl EditorState {
             exit_request: EditorExitRequest::None,
             doc: Document::new(),
             selection: None,
-            view: DocViewport::new()
+            view: DocViewport::new(),
+            status: EditorStatus::IDLE
         }
     }
 }
@@ -147,5 +149,28 @@ impl EditorState {
             doc_utils::delete_range(&mut self.doc, selection);
             self.selection = None;
         }
+    }
+}
+
+// ##################
+// # Status Message #
+// ##################
+
+pub enum EditorStatus {
+    IDLE,
+    ERROR(String)
+}
+
+impl EditorState {
+    pub fn get_status(&self) -> &EditorStatus {
+        return &self.status;
+    }
+
+    pub fn reset_status(&mut self) {
+        self.status = EditorStatus::IDLE;
+    }
+
+    pub fn log_error(&mut self, msg: String) {
+        self.status = EditorStatus::ERROR(msg);
     }
 }

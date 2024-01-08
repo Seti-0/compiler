@@ -9,6 +9,7 @@ use crate::editor::{
     },
     state::{
         EditorState,
+        EditorStatus,
         CodeEditorMode,
         EditorExitRequest
     }
@@ -107,20 +108,30 @@ fn draw_header(term: &mut Terminal, state: &EditorState) {
 // ######################
 
 fn draw_footer(term: &mut Terminal, state: &EditorState) {
-    // The status bar.
+    // The status bar background.
     term.draw_rect(Color::Footer, 0, term.h - 1, term.w, 1);
     term.set_cursor_pos(0, term.h - 1);
-    {
-        let cursor_x = state.view.cursor_x();
-        let cursor_y = state.view.cursor_y();
-        term.write(Color::FooterStatusContent, &format!("{},{}", cursor_x, cursor_y));
-        if let Some(selection) = state.get_selection() {
-            let sel_len = selection.get_text(&state.doc).chars().count();
-            term.write(Color::FooterStatusContent, &format!(" ({} selected)", sel_len));
-        }
 
-        term.write(Color::FooterStatusContent, &format!("        {}", term.get_input_debug()));
+    match state.get_status() {
+        EditorStatus::IDLE => {
+            // If there is no status message to display, show the cursor position.
+            let cursor_x = state.view.cursor_x();
+            let cursor_y = state.view.cursor_y();
+            term.write(Color::FooterStatusInfoContent, &format!("{},{}", cursor_x, cursor_y));
+            if let Some(selection) = state.get_selection() {
+                // Also aknowledge the selection if there is one.
+                let sel_len = selection.get_text(&state.doc).chars().count();
+                term.write(Color::FooterStatusInfoContent, &format!(" ({} selected)", sel_len));
+            }
+        },
+        EditorStatus::ERROR(str) => {
+            // If there is a message, display it.
+            term.write(Color::FooterStatusError, " ERROR ");
+            term.write(Color::FooterStatusErrorContent, &format!(" {} ", &str))
+        }
     }
+
+    term.write(Color::FooterStatusInfoContent, &format!("        {}", term.get_input_debug()));
 }
 
 // ######################
@@ -158,13 +169,18 @@ impl Bounds {
     }
 }
 
+pub fn compute_content_size(term: &Terminal) -> (usize, usize) {
+    let w = term.w;
+    let h = term.h - 4.min(term.h);
+    return (w, h);
+}
+
 /// Get the area in which the editor lines are drawn.
 /// Excludes the header and footer.
 fn compute_content_bounds(term: &Terminal) -> Bounds {
     let x = 0;
     let y = 2;
-    let w = term.w;
-    let h = term.h - 4.min(term.h);
+    let (w, h) = compute_content_size(term);
     return Bounds::new(x, y, w, h);
 }
 

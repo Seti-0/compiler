@@ -21,6 +21,7 @@ mod editor {
     #[path="e-document.rs"] pub mod doc;
     #[path="f-viewport.rs"] pub mod viewport;
     #[path="g-state.rs"] pub mod state;
+    #[path="h-fs.rs"] pub mod fs;
     #[path="h-drawing.rs"] pub mod drawing;
     #[path="i-actions.rs"] pub mod actions;
     #[path="j-editor.rs"] pub mod editor;
@@ -32,61 +33,13 @@ use lexer::Lexer;
 use logos::Logos;
 */
 
-use std::fs;
-use std::io::Read;
-
-use crate::editor::{
-    external::{
-        ModifierKey,
-        is_pressed, 
-        copy_to_clipboard
-    },
-    colors::Color,
-    editor::CodeEditor
-};
+use crate::editor::editor::CodeEditor;
 
 //lalrpop_mod!(pub grammar); // synthesized by LALRPOP
 
 fn main() {
-    println!("{}Hello world!{}", Color::ExitMessage, Color::Reset);
-
-    let read_res = fs::OpenOptions::new()
-        .read(true)
-        .open("demo.via");
-
-    let mut content = String::new();
-    match read_res {
-        Ok(mut file) => {
-            file.read_to_string(&mut content)
-                .expect("Failed to read from save file!");
-        },
-        Err(e) => {
-            // At some point a status message would be nice...
-        }
-    };
-
     let mut editor = CodeEditor::new();
-    editor.set_content(content);
     editor.run();
-
-    {
-        let write_res = fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open("demo.via")
-            .and_then(|mut file|{
-                use std::io::Write;
-                file.write_all(editor.get_content().as_bytes())
-            });
-
-        if let Err(error) = write_res {
-            // This is going to be an annoying one to implement eventually.
-            // Either just a "sorry, I'm noping out" message
-            // Or a dialog with retry.
-        }
-
-    }
 }
 
 /*

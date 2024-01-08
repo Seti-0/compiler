@@ -7,11 +7,18 @@
 
 use crate::editor::{
     colors::Color,
-    doc::Document,
     terminal::Terminal,
-    state::EditorState,
-    viewport::DocViewport,
-    drawing::draw_editor,
+    state::{
+        EditorState,
+        EditorStatus
+    },
+    fs::{
+        save, load
+    },
+    drawing::{
+        draw_editor,
+        compute_content_size
+    },
     actions::check_editor_actions
 };
 
@@ -57,17 +64,23 @@ impl CodeEditor {
 /// and drawing the editor. This is a blocking function, and will
 /// only return when the terminal is exited by the user.
 fn run_editor(editor: &mut CodeEditor) {
-    let mut term = Terminal::new();
-    let state = &mut editor.state;
+    println!("{}Hello World!{}", Color::ExitMessage, Color::Reset);
 
+    let state = &mut editor.state;
+    load(state);
+
+    let mut term = Terminal::new();
     term.update_terminal_size();
-    state.view.set_size(term.w, term.h);
+
+    let (view_w, view_h) = compute_content_size(&term);
+    state.view.set_size(view_w, view_h);
 
     term.clear();
     draw_editor(&mut term, state);
     term.flush();
 
     loop {
+        state.reset_status();
         let input = term.get_input();
         check_editor_actions(input, state);
 
@@ -82,8 +95,21 @@ fn run_editor(editor: &mut CodeEditor) {
         term.flush();
     }
 
+    save(state);
+
     term.clear();
     term.set_cursor_pos(0, 0);
-    term.write(Color::ExitMessage, "Goodbye!");
+    match state.get_status() {
+        EditorStatus::IDLE => {
+            // All good.
+            term.write(Color::ExitMessage, "Goodbye!");
+        },
+        EditorStatus::ERROR(e) => {
+            // There was an error at the end.
+            // This can happen if saving failes, for example.
+            term.write(Color::FooterStatusError, " ERROR ");
+            term.write(Color::FooterStatusErrorContent, &format!(" {} ", &e));
+        }
+    }
     term.flush();
 }

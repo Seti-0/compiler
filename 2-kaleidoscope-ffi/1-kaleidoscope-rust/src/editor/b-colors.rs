@@ -35,9 +35,9 @@ pub enum Color {
     // Footer
     Footer,
     FooterStatusInfo,
-    FooterStatusSuccess,
+    FooterStatusInfoContent,
     FooterStatusError,
-    FooterStatusContent
+    FooterStatusErrorContent,
 }
 
 // Note that Display is implemented for Color, which means that despite
@@ -103,8 +103,8 @@ impl Color {
             Color::Footer => (WHITE, GRAY0),
             Color::FooterStatusInfo => (WHITE, BLUE),
             Color::FooterStatusError => (WHITE, RED),
-            Color::FooterStatusSuccess => (WHITE, GREEN),
-            Color::FooterStatusContent => (GRAY4, GRAY0)
+            Color::FooterStatusInfoContent => (GRAY4, GRAY0),
+            Color::FooterStatusErrorContent => (RED, GRAY0)
         };
 
         return format!(
