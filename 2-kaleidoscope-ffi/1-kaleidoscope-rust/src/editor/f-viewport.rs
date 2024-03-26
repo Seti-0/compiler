@@ -2,12 +2,13 @@
 // # Intro: Document Viewport #
 // ############################
 
-// This one is short and sweet, it's essentially just 
-// storage for a cursor, relating that to a window into
-// a document, and updating the window position so that it
+// This one is just storage for a cursor, relating that to a 
+// window into a document, and updating the window position so that it
 // always contains the cursor.
 
-use crate::editor::doc::Document;
+use crate::editor::doc::{
+    Document, doc_utils
+};
 
 // ######################
 // # DocViewport struct #
@@ -67,8 +68,8 @@ fn limit_window_pos(viewport: &mut DocViewport, doc: &Document) {
     let min_window_x = cursor_x - (viewport.w - 1.min(viewport.w)).min(cursor_x);
     let min_window_y = cursor_y - (viewport.h - 1.min(viewport.h)).min(cursor_y);
 
-    let content_w = doc.get_line_len(cursor_y);
-    let content_h = doc.get_line_count();
+    let content_w = doc_utils::get_line_len(doc, cursor_y);
+    let content_h = doc_utils::get_line_count(doc);
     let mut max_window_x = content_w - viewport.w.min(content_w);
     let mut max_window_y = content_h - viewport.h.min(content_h);
     max_window_x = max_window_x.max(min_window_x).min(cursor_x);
@@ -80,32 +81,3 @@ fn limit_window_pos(viewport: &mut DocViewport, doc: &Document) {
     viewport.window_x = viewport.window_x.clamp(min_window_x, max_window_x);
     viewport.window_y = viewport.window_y.clamp(min_window_y, max_window_y);
 }
-
-/*
-fn limit_cursor(viewport: &mut DocViewport, doc: &Document) {
-    // The x-coordinate is easy, it's only bound by the line length.
-    let line_len = doc.get_line_len(viewport.cursor_y);
-    viewport.cursor_x = viewport.cursor_x.min(line_len);
-
-    // The y-coordinate is a bit trickier, because it can extend beyond the 
-    // document height into the remaining window height. This is to allow
-    // the user to begin writing further down.
-    
-    // For the y-coordinate, we are limiting a zero-based index, not a height.
-    // This means subtracting one from both constraints.
-    let view_max = viewport.h - 1.min(viewport.h);
-    let text_height = doc.get_line_count();
-    let mut text_max = text_height - 1.min(text_height);
-    if doc.get_content().ends_with('\n') {
-        // TODO: Is this needed? doc.get_line_count should align with 
-        // doc.get_lines(), but I don't think it does right now.
-        // doc.get_lines() considers a final empty line in the case of a final
-        // newline, but doc.get_line_count doesn't. It probably should?
-        text_max += 1;
-    }
-    // Limit y to keep the end of the text within the view.
-    // Or, if the text is empty, then to use the full view.
-    let max_y = view_max.max(text_max + view_max);
-    viewport.cursor_y = viewport.cursor_y.min(max_y);
-}
-*/

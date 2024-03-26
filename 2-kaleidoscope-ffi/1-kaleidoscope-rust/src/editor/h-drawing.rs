@@ -4,8 +4,8 @@ use crate::editor::{
         Input, Terminal
     },
     doc::{
-        Document,
-        DocRange
+        Document, DocRange,
+        doc_utils
     },
     state::{
         EditorState,
@@ -26,22 +26,6 @@ use super::viewport::DocViewport;
 // This file contains functions and datastructures related to
 // writing the current state of the code editor to the terminal.
 
-/*/
-/// Update window position so that it always includes the cursor.
-/// This implicitly allows the window to be moved by the cursor.
-pub fn update_viewport_position(term: &Terminal, editor: &mut CodeEditor) {
-    let Bounds{x, y, w, h} = compute_content_bounds(term);
-    let (content_w, content_h) = (w, h);
-
-    editor.model.normalize_pos(content_h);
-    let (editor_x, editor_y) = editor.model.pos;
-    let min_viewport_x = editor_x - (content_w - 1.min(content_w)).min(editor_x);
-    let min_viewport_y = editor_y - (content_h - 1.min(content_h)).min(editor_y);
-    editor.x = editor.x.clamp(min_viewport_x, editor_x - 1.min(editor_x));
-    editor.y = editor.y.clamp(min_viewport_y, editor_y - 1.min(editor_y));
-}
-*/
-
 // At the moment the layout is kept really simple. 
 // There is a one-line header, a one-line footer, and the rest of the
 // lines are lines of code. (So called 'content lines')
@@ -51,7 +35,7 @@ pub fn draw_editor(term: &mut Terminal, state: &EditorState) {
     draw_header(term, state);
 
     let doc = &state.doc;
-    let line_count = doc.get_line_count();
+    let line_count = doc_utils::get_line_count(doc);
     let content_info = compute_content_metrics(term, line_count);
 
     let (view_x, view_y) = state.view.get_window_pos();
@@ -86,7 +70,8 @@ fn draw_header(term: &mut Terminal, state: &EditorState) {
         CodeEditorMode::Edit => ("EDITING CODE", Color::HeaderModeEdit)
     };
     term.set_cursor_pos(0, 0);
-    term.write(Color::HeaderFilename, " demo.via ");
+    let filename = if state.is_transient() {"(transient)"} else {"demo.via"};
+    term.write(Color::HeaderFilename, &format!(" {} ", filename));
     term.write(mode_color, &format!(" {} ", mode_text));
     
     if state.is_exit_request_pending() {
@@ -139,7 +124,7 @@ fn draw_footer(term: &mut Terminal, state: &EditorState) {
 // ######################
 
 fn draw_cursor(term: &mut Terminal, state: &EditorState) {
-    let line_count = state.doc.get_line_count();
+    let line_count = doc_utils::get_line_count(&state.doc);
     let content_info = compute_content_metrics(term, line_count);
 
     let abs_x = state.view.cursor_x();

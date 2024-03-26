@@ -60,6 +60,10 @@ impl Terminal {
     }
 
     /// Output text to the terminal in the given color.
+    /// TODO: clip this input by the terminal bounds to help with 
+    /// overflowing text, maybe? With error messages for example.
+    /// This does mean keeping track of the current cursor position
+    /// in the terminal!
     pub fn write(&mut self, color: Color, content: &str) {
         if content.len() > 0 {
             self.next_output += &color.to_string();
@@ -91,6 +95,13 @@ impl Terminal {
 
     /// Flush terminal output. This is needed for the terminal to display
     /// anything at all, since I'm batching output manually.
+    /// TODO: There is still flicker here!
+    /// See https://stackoverflow.com/questions/71452837/how-to-reduce-flicker-in-terminal-re-drawing
+    /// for suggestions. Notably, it's suggested that one does *not* clear the entire screen each update.
+    /// This would mean maintain an intermediate state to be drawn I guess, and then diffing that with the
+    /// actual state, only applying updates where needed.
+    /// I'm not sure this will actually solve anything though, since the flicker seems to be related to
+    /// the cursor position changing.
     pub fn flush(&mut self) {
         print!("{}", self.next_output);
         self.next_output.clear();

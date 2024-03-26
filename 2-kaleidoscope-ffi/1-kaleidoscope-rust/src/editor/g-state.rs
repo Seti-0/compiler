@@ -22,7 +22,8 @@ pub struct EditorState {
     pub doc: Document,
     selection: Option<DocRange>,
     pub view: DocViewport,
-    status: EditorStatus
+    status: EditorStatus,
+    transient: bool
 }
 
 impl EditorState {
@@ -33,7 +34,8 @@ impl EditorState {
             doc: Document::new(),
             selection: None,
             view: DocViewport::new(),
-            status: EditorStatus::IDLE
+            status: EditorStatus::IDLE,
+            transient: false
         }
     }
 }
@@ -113,6 +115,15 @@ impl EditorState {
         return &self.selection;
     }
 
+    pub fn select_all(&mut self)
+    {
+        self.doc.insertion_index = 0;
+        self.clear_selection();
+        self.begin_selection();
+        self.doc.insertion_index = self.doc.len();
+        self.extend_selection();
+    }
+
     pub fn begin_selection(&mut self) {
         let index = self.doc.insertion_index;
 
@@ -172,5 +183,22 @@ impl EditorState {
 
     pub fn log_error(&mut self, msg: String) {
         self.status = EditorStatus::ERROR(msg);
+    }
+}
+
+// ##############
+// # Transience #
+// ##############
+
+// When the editor is in a transient state,
+// it's contents are not saved to disk.
+
+impl EditorState {
+    pub fn set_transient(&mut self, val: bool) {
+        self.transient = val;
+    }
+
+    pub fn is_transient(&self) -> bool {
+        return self.transient;
     }
 }

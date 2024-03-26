@@ -37,8 +37,9 @@ opaque_struct!(LW_TargetMachine);
 
 use std::os::raw::c_char;
 
-use libc::c_short;
+//use libc::c_short;
 
+/*
 #[link(name="C:/Projects/compiler/2-kaleidoscope-ffi/1-kaleidoscope-rust/target/debug/LLVM_Wrapper", kind="dylib")]
 extern {
     fn test();
@@ -48,6 +49,7 @@ extern {
     fn LW_GetDefaultMachine() -> *const LW_TargetMachine;
     fn LW_TargetMachine_GetDescription(target: *const LW_TargetMachine) -> *const c_char;
 }
+*/
 
 // #################
 // # Example Usage #

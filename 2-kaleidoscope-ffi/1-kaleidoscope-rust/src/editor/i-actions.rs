@@ -30,13 +30,14 @@ use crate::editor::{
 /// Checks the given input against a collated list
 /// of actions that can be applied to the editor.
 pub fn check_editor_actions(input: Input, state: &mut EditorState) {
-    const ACTIONS: [EditorAction; 6] = [
+    const ACTIONS: [EditorAction; 7] = [
         exit_action,
         ccp_action,
         mode_action,
         move_action,
         write_action,
-        delete_action
+        delete_action,
+        select_all_action
     ];
 
     for action in ACTIONS {
@@ -214,4 +215,13 @@ fn move_action(input: Input, state: &mut EditorState) -> bool {
     }
 
     return true;
+}
+
+/// Select all on CTRL-A.
+fn select_all_action(input: Input, state: &mut EditorState) -> bool {
+    if matches!(input, Input::SelectAll) {
+        state.select_all();
+        return true;
+    }
+    return false;
 }

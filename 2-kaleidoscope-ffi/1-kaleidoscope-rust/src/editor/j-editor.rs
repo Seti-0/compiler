@@ -50,6 +50,10 @@ impl CodeEditor {
         return self.state.doc.get_content();
     }
 
+    pub fn set_transient(&mut self, val: bool) {
+        self.state.set_transient(val);
+    }
+
     pub fn run(&mut self) {
         run_editor(self);
     }
@@ -95,7 +99,9 @@ fn run_editor(editor: &mut CodeEditor) {
         term.flush();
     }
 
-    save(state);
+    if !state.is_transient() {
+        save(state);
+    }
 
     term.clear();
     term.set_cursor_pos(0, 0);
@@ -106,7 +112,7 @@ fn run_editor(editor: &mut CodeEditor) {
         },
         EditorStatus::ERROR(e) => {
             // There was an error at the end.
-            // This can happen if saving failes, for example.
+            // This can happen if saving fails, for example.
             term.write(Color::FooterStatusError, " ERROR ");
             term.write(Color::FooterStatusErrorContent, &format!(" {} ", &e));
         }

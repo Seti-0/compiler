@@ -32,8 +32,7 @@ pub struct Document {
 }
 
 impl Document {
-    /// Create a new TextEditor with empty text, 
-    /// no selection, and the cursor set to (0,0).
+    /// Create a new Document with empty text.
     pub fn new() -> Document {
         Document {
             insertion_index: 0,
@@ -43,8 +42,6 @@ impl Document {
     }
 
     /// Set the content the editor is working with.
-    /// This updates the length and clears the selection.
-    /// It does not reset or normalize the position!
     pub fn set_content(&mut self, content: String) {
         self.text = content;
     }
@@ -57,17 +54,6 @@ impl Document {
     /// Get an iterator over the lines of text in this document.
     pub fn get_lines(&self) -> DocLineIter {
         return DocLineIter::new(&self);
-    }
-
-    pub fn get_line_count(&self) -> usize {
-        return self.get_lines().count();
-    }
-
-    pub fn get_line_len(&self, n: usize) -> usize {
-        return match self.get_lines().skip(n).next() {
-            Some(line) => line.b - line.a,
-            None => 0
-        };
     }
 
     /// Gets the insertion point as a (line, col) coordinate.
@@ -109,318 +95,6 @@ impl Document {
         // Which one should be used where?
         return self.text.len();
     }
-
-    /*
-    /// Begin a selection at the current insertion point.
-    /// NOTE: This does nothing if there is an existing selection!
-    /// NOTE: To start a new one, use clear_selection first.
-    pub fn begin_selection(&mut self) {
-        // Note: the insertion index is guaranteed to be in the range
-        // [0,N] where N is the length of the text. The selection
-        // should only have characters from the range [0,N).
-        if !self.has_selection {
-            let insertion_index = self.get_insertion_point();
-            if insertion_index == self.len {
-                self.selection_start = insertion_index;
-                self.selection_end = insertion_index;
-                self.has_selection = false;
-            }
-            else {
-                self.selection_start = insertion_index;
-                self.selection_end = insertion_index + 1;
-                self.has_selection = true;
-            }
-        }
-    }
-
-    /// Extends an existing selection to the current insertion point.
-    /// If there is no selection, begins a new one instead.
-    pub fn extend_selection(&mut self) {
-        if !self.has_selection {
-            self.begin_selection();
-            return;
-        }
-
-        let insertion_index = self.get_insertion_point();
-        if insertion_index < self.selection_start {
-            self.selection_start = insertion_index;
-        }
-        else {
-            self.selection_end = (insertion_index + 1).min(self.len());
-        }
-    }
-
-    /// Clears the selection, as it says on the tin.
-    /// This does not delete the selection, it just deselects.
-    pub fn clear_selection(&mut self) {
-        self.selection_start = 0;
-        self.selection_end = 0;
-        self.has_selection = false;
-    }
-
-    /// Deletes the contents of the selection.
-    /// This also clears the selection and sets the cursor.
-    pub fn delete_selection(&mut self) {
-        if !self.has_selection {
-            return;
-        }
-
-        let start = self.selection_start;
-        let end = self.selection_end;
-        if end > start {
-            self.text.replace_range(start..end, "");
-            self.pos = self.get_pos_for_index(start);
-            self.len -= end - start;
-        }
-
-        self.clear_selection();
-    }
-
-    /// Insert text at the current cursor location.
-    /// The cursor position is updated to the new insertion point.
-    /// 
-    /// If the y coordinate is greater than the number of lines,
-    /// the intervening lines are inserted.
-    /// 
-    /// If the x coordinate is greather than the length of the current line,
-    /// inserting begins and the end of the current line. Since the cursor
-    /// is updated by this function, this effectively brings the cursor
-    /// back to the end of the current line.
-    pub fn write(&mut self, ch: char) {
-        // y is zero-indexed, so for y=1 we need at least 2 lines.
-        // Hence the 'y + 1' below.
-        let y = self.pos.1;
-        self.reserve_lines(y + 1);
-
-        // The insertion index is guaranteed to be between 0 and the text length, inclusive.
-        // One remaining question I have is if insert_str handles appending gracefully or if
-        // I need to add code for that.
-        let insertion_index = self.get_insertion_point();
-        self.text.insert(insertion_index, ch);
-        self.pos = self.get_pos_for_index(insertion_index + 1);
-
-        self.len += 1;
-    }
-
-    /// Advances the (2-D) cursor to the next character.
-    /// This usually means shifting x by 1, but can mean going up and down too.
-    pub fn next_char(&mut self) {
-        let mut index = self.get_insertion_point();
-        index = (index + 1).min(self.len());
-        self.pos = self.get_pos_for_index(index);
-        self.x_limit_memory = self.pos.0;
-    }
-
-    /// Moves the 2-D cursor to the next line.
-    /// This uses some memory attached to the model for the sake of retaining
-    /// the desired x-position when crossing multiple lines.
-    pub fn next_line(&mut self) {
-        let (_, mut y) = self.pos;
-        y += 1;
-        self.pos = (self.x_limit_memory, y);
-    }
-
-    /// Moves the 2-D cursor to the previous line.
-    /// Similarly to next_line, this does something to help preserve
-    /// desired x-position across lines.
-    pub fn prev_line(&mut self) {
-        let (_, mut y) = self.pos;
-        y -= 1.min(y);
-        self.pos = (self.x_limit_memory, y);
-    }
-
-    /// Moves the (2-D) cursor to the previous character.
-    /// This usually means shifting x by 1, but can mean going up and down too.
-    pub fn prev_char(&mut self) {
-        let mut index = self.get_insertion_point();
-        index = index - 1.min(index);
-        self.pos = self.get_pos_for_index(index);
-        self.x_limit_memory = self.pos.0;
-    }
-
-    /// Move the cursor to the end of the next word, if possible.
-    /// This action is typically represented by CTRL-RIGHT on windows. 
-    pub fn next_word(&mut self) {
-        self.skip_to(true, |c: char| !c.is_whitespace());
-        self.skip_to(true, |c: char| c.is_whitespace());
-    }
-
-    /// Move the cursor to the start of the previous word, if possible.
-    /// This action is typically represented by CTRL-LEFT on windows. 
-    pub fn prev_word(&mut self) {
-        self.skip_to(false, |c: char| !c.is_whitespace());
-        self.skip_to(false, |c: char| c.is_whitespace());
-
-        // The performance of this model is laughable.
-        // Making it performant would be a hell of a rabbit hole,
-        // though, and the computer can do all this super quick.
-        // It's okay for a toy.
-        let index = self.get_insertion_point();
-        match self.text.chars().skip(index + 1).next() {
-            Some(ch) => {
-                if !ch.is_whitespace() {
-                    self.next_char();
-                }
-            },
-            // 'None' means the next index is the end of the text,
-            // which isn't really relevant for this adjustment.
-            None => ()
-        }
-    }
-
-    /// Moves the cursor forwards/backwards to the first character
-    /// that matches the given predicate. The cursor is moved to
-    /// the end/start of the text if no such character is found.
-    /// The text is not wrapped around.
-    /// Returns true if the requested character was found and moved to.
-    /// NOTE: If the current character matches the predicate, this function
-    /// does not move the cursor!
-    pub fn skip_to(&mut self, forwards: bool, predicate: fn(c: char) -> bool) -> bool {
-        let index = self.insertion_index;
-        let new_index: usize;
-        let found: bool;
-
-        if forwards {
-            if index < self.len() {
-                match self.text[index..].find(predicate) {
-                    Some(i) => {
-                        new_index = index + i;
-                        found = true;
-                    }
-                    None => {
-                        new_index = self.len();
-                        found = false;
-                    }
-                }
-            }
-            else {
-                new_index = self.len();
-                found = false;
-            }
-        }
-        else {
-            match self.text[..index].rfind(predicate) {
-                Some(i) => {
-                    new_index = i;
-                    found = true;
-                }
-                None => {
-                    new_index = 0;
-                    found = false;
-                }
-            }
-        }
-
-        self.insertion_index = new_index;
-        return found;
-    }
-
-    /// Delete the previous character at the insertion point.
-    /// i.e. applies the backspace key.
-    /// 
-    /// This function updates the cursor position after the deletion.
-    /// If the cursor is at the start of the document (or the document is empty)
-    /// this function does nothing.
-    pub fn delete(&mut self) {
-        if self.insertion_index > 0 && self.text.len() > 0 {
-            self.text.remove(self.insertion_index - 1);
-            self.insertion_index -= 1;
-            self.len -= 1;
-        }
-    }
-
-    /// Similar to the delete function, but deletes the next character instead
-    /// of the previous one. The cursor does not change position.
-    /// i.e. applies the delete key.
-    /// 
-    /// If the insertion position is at the end of the document, this 
-    /// function does nothing.
-    pub fn delete_next(&mut self) {
-        if self.insertion_index < self.text.len() {
-            self.text.remove(self.insertion_index);
-            self.len -= 1;
-        }
-    }
-
-    /// Update the cursor pos based on a character being inserted.
-    /// At the moment, this just shifts the cursor forward by one unless it's
-    /// a newline, in which case it shifts it back by one.
-    /// 
-    /// It might be necessary to support tabs and non-visible tokens too?
-    /// But I'm hoping not, and instead filtering those out closer to the input.
-    /// Since this is code, I think it's reasonable to make 4 spaces out of tabs,
-    /// for example.
-    fn update_cursor_pos(&mut self, ch: char) {
-        let (x, y) = self.pos;
-        match ch {
-            '\n' => self.pos = (0, y + 1),
-            _ => self.pos = (x + 1, y)
-        }
-    }
-    */
-
-    /*
-    /// Insert a number of lines, if necessary, to match the given y-coordinate.
-    /// If the text already has more than the number of lines needed, nothing happens.
-    fn reserve_lines(&mut self, y: usize) {
-        let height = self.get_line_count();
-        let (x, y) = self.pos;
-
-        if y > height {
-            let mut delta_y = y - height;
-            if !self.text.ends_with('\n') {
-                delta_y += 1;
-            }
-
-            for i in 0..delta_y {
-                self.text.push('\n');
-                self.len += 1;
-            }
-        }
-    }
-    
-    /// Get the text "height", which is the number of newlines,
-    /// plus one if there is some content but no newlines.
-    /// 
-    /// There are interesting edge cases:
-    /// > Empty text has height 0
-    /// > Text that ends in a newline does not
-    /// have height to account for the final empty line.
-    /// 
-    /// In other words, this is the actual height of the text,
-    /// not the height of the region used to the draw the text.
-    /// That calculation is left to the code that actually does
-    /// the drawing. 
-    pub fn get_line_count(&self) -> usize {
-        // Empty text has height zero.
-        if self.text.len() == 0 {
-            return 0;
-        }
-
-        let mut index = 0;
-        let mut count = 0;
-        loop {
-            match self.text[index..].find('\n') {
-                Some(i) => {
-                    count += 1;
-                    index += i + 1;
-                }
-                None => break
-            }
-        }
-
-        if self.text.ends_with('\n') {
-            // Don't consider an extra empty line.
-            return count;
-        }
-        else {
-            // Do consider the line that follows the last newline as well.
-            // This includes the case where there are no newlines (count is 0),
-            // in which case the non-empty text has height one.
-            return count + 1;
-        }
-    }
-    */
 }
 
 // ############################
@@ -471,6 +145,19 @@ pub mod doc_utils {
         Document, DocRange,
         skip_to
     };
+
+    ///
+    pub fn get_line_count(doc: &Document) -> usize {
+        return doc.get_lines().count();
+    }
+
+    pub fn get_line_len(doc: &Document, n: usize) -> usize {
+        return match doc.get_lines().skip(n).next() {
+            Some(line) => line.b - line.a,
+            None => 0
+        };
+    }
+
 
     /// Set the current desired x position if the (line, col) cursor
     /// based on the current insertion position. Used to help the user

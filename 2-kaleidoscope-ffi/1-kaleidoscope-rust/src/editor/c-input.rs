@@ -30,6 +30,7 @@ pub enum Input {
     Right,
     Down,
     Cancel,
+    SelectAll,
     Unknown
 }
 
@@ -57,6 +58,7 @@ pub fn get_input(debug: &mut String) -> Input {
     }
 
     match  next_char(debug) {
+        ASCII_SOH => Input::SelectAll,
         ASCII_EOT => Input::Exit,
         ASCII_BACKSPACE => Input::Backspace,
         ASCII_ESC => Input::Escape,
@@ -77,15 +79,16 @@ pub fn get_input(debug: &mut String) -> Input {
     }
 }
 
-// ############################
-// # Reading Input from STDIN #
-// ############################
+// #############
+// # Constants #
+// #############
 
 // Most input from the terminal seems to a variant ASCII, for what I'm doing anyways.
 // I say a variant because while the input is strictly in bytes, there is
 // an escape character outside the range of ascii I don't recognize.
 // I don't know what standard it's following, I just used trial and error to see what works.
 
+pub const ASCII_SOH: u8 = 1; // 'Start of Heading', used for CTRL-A
 pub const ASCII_EOT: u8 = 3; // 'End of Text', used for CTRL-C
 const ASCII_BACKSPACE: u8 = 8;
 const ASCII_CR: u8 = 13; // 'Carraige Return', used for the enter key in Windows

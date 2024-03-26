@@ -99,9 +99,8 @@ pub fn copy_to_clipboard(text: &str) {
 // for this, but then, I really don't like the 
 // external dependencies here.
 
-// TODO: Can this path be relative?
 // TODO: Can this be linked statically somehow?
-#[link(name="C:/Projects/compiler/2-kaleidoscope-ffi/1-kaleidoscope-rust/target/debug/LLVM_Wrapper", kind="dylib")]
+#[link(name="target/debug/LLVM_Wrapper", kind="dylib")]
 extern {
     fn LW_Getch() -> i32;
     fn LW_GetKeyState(virtual_key: i32) -> c_short;
