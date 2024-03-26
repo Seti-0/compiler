@@ -11,8 +11,15 @@ use std::fmt::Display;
 
 /// A named color for use in the editor.
 /// Intended to be translated to ansi commands via formatting.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub enum Color {
+    // Default
+    Default,
+    // Debugging
+    DebugRed,
+    DebugBlue,
+    DebugYellow,
+    DebugGreen,
     // Basics
     Reset,
     ClearColor,
@@ -55,12 +62,14 @@ impl Display for Color {
 impl Color {
     /// Returns an ansi terminal color command representation of the color.
     fn get_ansi_command(&self) -> String {
+        const PURE_BLACK: ColorRGB = ColorRGB{r: 0, g: 0, b:0};
         const GRAY0: ColorRGB = ColorRGB{r: 25, g: 25, b: 25};
         const GRAY1: ColorRGB = ColorRGB{r: 35, g: 35, b: 35};
         const GRAY2: ColorRGB = ColorRGB{r: 45, g: 45, b: 45};
         const GRAY3: ColorRGB = ColorRGB{r: 55, g: 55, b: 55};
         const GRAY4: ColorRGB = ColorRGB{r: 130, g: 130, b: 130};
         const GRAY5: ColorRGB = ColorRGB{r: 180, g: 180, b: 180};
+        const PURE_WHITE: ColorRGB = ColorRGB{r: 255, g: 255, b:255};
 
         const PURPLE: ColorRGB = ColorRGB{r: 127, g: 32, b: 176};
         const DARK_PURPLE: ColorRGB = ColorRGB{r: 72, g: 44, b: 85};
@@ -75,11 +84,18 @@ impl Color {
 
         const WHITE: ColorRGB = ColorRGB{r: 220, g: 220, b: 220};
 
-        if matches!(self, Color::Reset) {
+        if matches!(self, Color::Reset) || matches!(self, Color::Default) {
             return "\x1b[0m".to_string();
         }
 
         let (fg, bg) = match self {
+            // Defaults
+            Color::Default => (PURE_WHITE, PURE_BLACK),
+            // Debugging
+            Color::DebugBlue => (WHITE, BLUE),
+            Color::DebugGreen => (WHITE, GREEN),
+            Color::DebugRed => (WHITE, RED),
+            Color::DebugYellow => (WHITE, YELLOW),
             // Basics
             Color::Reset => (WHITE, GRAY0), // This should be unreachable due to the if clause above.
             Color::ClearColor => (WHITE, GRAY0),

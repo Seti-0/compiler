@@ -10,7 +10,7 @@
 #![allow(unused_variables)]
 #![allow(unreachable_code)]
 
-use crate::editor::editor::CodeEditor;
+use crate::editor::{editor::CodeEditor, terminal::Terminal};
 
 // ###############
 // # Entry Point #
@@ -79,6 +79,33 @@ fn main() {
 
     */
     
+    //print!("நி\n");
+    //print!("{:?}\n", "நி".as_bytes());
+    //print!("{:?}\n", "நி".chars());
+
+    /*
+    use crate::editor::{
+        terminal::Terminal,
+        colors::Color
+    };
+    let mut x = Terminal::new();
+
+    x.update_terminal_size();
+    x.clear();
+    x.set_cursor_pos(0, 0);
+    x.write(Color::DebugRed, "h");
+    x.set_cursor_pos(1, 0);
+    x.write(Color::Default, " ");
+    x.set_cursor_pos(0, 1);
+    x.write(Color::DebugBlue, "ᄀᄀᄀ각ᆨᆨ");
+    x.set_cursor_pos(0, 3);
+    x.write(Color::DebugGreen, format!("{:?}", "ᄀᄀᄀ각ᆨᆨ".chars()).as_str());
+    x.set_cursor_pos(0, 4);
+    x.write(Color::DebugGreen, format!("{:?}", "ᄀᄀᄀ각ᆨᆨ".bytes()).as_str());
+
+    x.flush();
+*/
+
     let mut editor = CodeEditor::new();
     editor.set_transient(true);
     editor.run();

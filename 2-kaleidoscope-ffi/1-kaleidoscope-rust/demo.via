@@ -1,4 +1,6 @@
-Hello world!
+def hello() {
+    print("Hello world!")
+}
 
-written by Kieran Marquis de Khat
-Signed by the Lord Thomas Felix of the House of Clovers
+# Written by Kieran Marquis de Khat
+# Signed by the Lord Thomas Felix of the House of Clovers
