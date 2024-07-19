@@ -1,0 +1,233 @@
+#########################
+# Dispatch: Inheritence #
+#########################
+
+I'd like the following properties from inheritence:
+
+    - No overhead for non-virtual types.
+
+That's kind of it actually.
+Well, obviously the virtual ones should be as efficient as possible too.
+
+I have the following fundamental rules:
+
+    - Inheritence is declared upfront. No late inheritence.
+
+That's... actually also it, surprisingly.
+HOWEVER.
+There might be another which is quite restrictive.
+
+    - Virtual functions must be declared upfront. No late virtuals.
+
+I'm not sure if it's required yet. It might be possible to register new
+sub-vtables that can be accessed from the original vtable, for example.
+
+#####################
+# Aside: Templating #
+#####################
+
+Just as a quick aside.
+I'm about to go into how runtime table lookups can be used to 
+implement inheritence, so that even if we don't know what type we have exactly,
+we can still call virtual functions.
+
+It sometimes would be possible to tell concrete types without doing this.
+In fact, as long as there were no hetrogenous collections leveraging polymorphism, 
+inheritence could be be implemented using templating alone even.
+
+Though, the main use case of inheritence is precisely hetrogenous collections.
+Even then, it would be possible to write code that is more efficient then a table
+lookup for each call, specific to each collection of types iterated over.
+
+However, all of this is niche optimization, and even then with serious tradeoffs
+in terms of compile-times, implementation complexity, debuggability, and binary size.
+So while it might be nice to delve down the rabbit whole sometime, I'm considering
+the dynamic approach to be the main one this language follows.
+
+#################
+# Memory Layout #
+#################
+
+A non-virtual, non-trait struct has the following memory layout:
+
+--ebnf
+# Concrete layout.
+data
+--
+
+As in, there is no meta info (since the concrete type is known)
+There is no virtual tables or anything.
+I'll come back to traits.
+
+Note here that we need to know upfront whether or not a structure
+is virtual or non-virtual.
+
+If (AND ONLY IF) a struct has virtual functions defined on it, 
+it has the following modified layout:
+
+--ebnf
+# Virtual base class layout.
+meta
+lookup
+data
+--
+
+This adds meta. (a pointer to static memory)
+And it adds lookup. (again, pointer to static memory)
+The lookup has a pointer for each virtual function defined on the type.
+Note that to make the lookup-table we need to know all the virtual
+functions upfront.
+
+It would definitely be possible to make the vtable extensible, 
+but I don't know if it would be sensible to do so.
+I'll come back to it.
+
+Anyways, a parent and child class could look like:
+
+--ebnf
+# Parent layout.
+meta         # Used for dynamic reflection. Could be omitted if not needed. 
+a_lookup     # Points to a's virtual functions.
+a_data       # Same as in a normal non-virtual type.
+
+# Child layout.
+meta             # Again, slot for dynamic reflection. This time it contains info about the child.
+a_lookup         # Same layout as before, but some entries are different, for child overrides.
+a_data           # Exact same as parent.
+b_lookup         # Again, useless unless there is a child class of the child.
+b_data           # Functions on the parent don't care about this. Only child functions and overrides do.
+
+# Child of the child.
+meta            # Same as before
+a_lookup
+a_data
+b_lookup
+b_data
+c_lookup        # We can just keep adding blocks for descendents.
+c_data
+--
+
+###########################
+# Late Virtual Definition #
+###########################
+
+Obviously late inline data definition on an external type is a no-go.
+The static lookup tables can't be extended, new fields can't be added.
+However... that doesn't necessarily make this kind of thing impossible?
+
+A late virtual definition or late field definition could be transformed
+into a wrapping type, by the compiler, since external code that can't see the
+late definitions don't need to know about them. But that might not be an answer - 
+what happens when the wrapping type needs to be added to a collection held externally?
+
+So... maybe impossible.
+Even if possible, it would be a fairly complicated feature to implement, and actively
+bad practice in a lot of cases, so it might never be worth exploring properly.
+
+However, one simple case I can think of that might make this worth exploring
+further is that of debugging - adding tags to things and such.
+
+###############
+# Destruction #
+###############
+
+drop() has to be a virtual process, if not a virtual function exactly.
+They don't replace ancestor implementations, rather, each is called in reverse order
+to fully destroy the instance.
+
+The main issue with destruction is calling virtual functions on partially-destroyed
+instances. If the function-call is entirely non-virtual, it's fine, since the child
+data won't be relied on. But if the function is virtual, or non-virtual but somewhere
+down the callstack a virtual function is called, then we might be depending on destroyed
+data we can't depent on.
+
+It's important to note that just banning virtual calls within drop() isn't enough, because
+non-virtual functions can call virtual ones.
+
+There are two options I can see:
+
+    - Make the virtual requirement of a parameter something the compiler keeps track of.
+      The user doesn't have to know, it's not declared, but just as the compiler keeps track
+      of if a type is a reference or a shared pointer etc, it keeps track of if the type
+      needs to be ready for virtual calls.
+      In this case, calls requiring virtual instances can be banned in the constructor.
+    
+    - Allow virtual calls, but have them call valid overrides only.
+      So overrides will cease to exist gradually. Since there is no pure-abstract
+      behaviour in this language, this is always well defined.
+      But it's also a bit of an unexpected foot-gun.
+
+The first case could create very obscure compile-time errors.
+The second case could create very obscure run-time bugs.
+
+Obviously, if I could make it performant enough, I'd prefer the first one with 
+solid static analysis, and friendly user-breakdowns to help the user understand 
+what is going wrong.
+
+################
+# Construction #
+################
+
+Construction has the same virtual issue as destruction,
+so see above for my thoughts on that.
+
+It has another mess though, which is when to consider the base
+ready to call base functions on. And since functions in the class
+can call base functions, this means calling any function is tricky.
+
+One idea I have is the following syntax for object literals.
+Below, the base constructor is called, then the child fields
+are filled in. This is actually just the same constraint C++
+and C# has, in a way, since it means no methods on the GameplayMessage
+can be called before the Message constructor has executed.
+
+--via
+let user_msg = get_user_message()
+
+GameplayMessage {
+    Super(user_msg)
+    source: source.world,
+    world: source
+}
+--
+
+It's a bit odd, but I like it.
+Here is a more complete example:
+
+--via
+struct GameplayMessage {
+    extends Message
+    World, GameObj source
+}
+
+def GameplayMessage(GameObj source) {
+    return Self {
+        Super()
+        source: source.world,
+        world: source
+    }
+}
+--
+
+It is a bit verbose.
+We could go with a more classical constructor:
+
+--via
+def GameplayMessage(GameObj source) {
+    let user_msg = get_user_message()
+    Super(user_msg)
+
+    source = source.world,
+    world = source
+}
+--
+
+But a few rules would be needed.
+Namely, no functions on the instance being constructed can be called until:
+
+     - The base constructor has been called using extends.
+
+     - All field data has been initialized.
+
+This... is quite a bit to keep track of for larger and more complicated constructors.
+So I'm leaning against it.

@@ -1,0 +1,208 @@
+######################
+# Literals: Booleans #
+######################
+
+These are so lovely and simple.
+
+--via
+true, false
+--
+
+#####################
+# Literals: Numbers #
+#####################
+
+These are so not lovely and so not simple.
+
+--via
+# Valid Integers
+0
+1000
+23
+1
+01234
+-1
+-0
+
+# Valid Separated Integers
+120_13
+124_14_14
+
+# Valid Reals
+1.1
+01234.23
+234.1
+42.323_141_123
+.23
+
+# Invalid Reals
+-.
+.-
+124.
+123.1234.23
+123.1.234.1...12
+123...
+34.-52
+
+# Valid Floats
+1e10
+321e3124
+-12e-12
+24.3e543
+-24.3e543
+1e100_000_000
+
+# Invalid Floats
+e12
+1ee2
+1e_100
+1e100_
+123.34e2134.2
+123.34e-2134.2
+--
+
+After messing with regex101 for a while, I arrived at:
+
+--regex
+((-?(\d+)(_\d+)*)|((-?(\d+)(_\d+)*)?(\.\d+(_\d+)*)))(e-?\d+(_\d+)*)?
+--
+
+And for octal/hex/binary, simpler ones:
+
+--regex
+0b([01]+)(_[01]+)*
+0o([0-7]+)(_[0-7]+)*
+0x([0-9a-fA-F]+)(_[0-9a-fA-F]+)*
+--
+
+#####################
+# Literals: Strings #
+#####################
+
+I haven't fleshed this section out yet.
+
+--via
+"Hey!"
+"Hello {:?}, Welcome\n".format("World")
+
+let x = m"
+	Hello World!
+"
+
+let y = r"\n\r"
+--
+
+###################
+# Literals: Lists #
+###################
+
+QUESTION: How do lists interact with tuples?
+With a direct top-down approach, the tuple would consume all the items and you'd get one item in the list which is a tuple...
+
+--via
+[1, 2, 3, 4]
+--
+
+##########################
+# Literals: Dictionaries #
+##########################
+
+Same question here for tuples. In this case it would be a syntax error with the straight-forward approach.
+Since the comma would be consumed, so you'd get [X : Y : Z], where Y has the comma locked inside, which isn't legal.
+
+--via
+[1: "a", 2: "b"]
+--
+
+#####################
+# Literals: Objects #
+#####################
+
+Note that using a constructor for the object would be much more common.
+However, within constructors themselves, using an object literal would be the standard approach.
+
+--via
+Tree {
+    species: ROWAN
+}
+
+# As opposed to:
+Tree(ROWAN)
+--
+
+For objects from types in an inheritence hierarchy,
+only fields newly defined by the subtype are defined in the object literal.
+The base parameterless constructor is called.
+
+If instead we need a constructor with parameters,
+an instance of "Super" is given. Super and Self are reserved type aliases.
+
+--via
+Tree {
+	Super(position, texture)
+    species: ROWAN
+}
+
+# Or, explicitly:
+Tree {
+	Entity(position, texture)
+    species: ROWAN
+}
+--
+
+##########
+# Tuples #
+##########
+
+The comma for tuples is an operator! Not a literal type.
+This feels weird, but it makes for nice interaction with brackets
+for grouping.
+
+In any case, this means they are not relevant here.
+
+###########
+# Grammar #
+###########
+
+This grammar is incomplete.
+It's missing things like:
+
+ > String escape codes
+ > Multiline strings
+
+--ebnf
+expression = (
+    | ...
+	| literal
+	| ...
+);
+
+literal = (
+	| boolean_literal
+	| numeric_literal
+	| string_literal
+	| list_literal
+	| dictionary_literal
+    | object_literal
+);
+
+boolean_literal= 'true' | 'false'
+numeric_literal = (
+	...
+	| decimal_literal
+	| binary_literal
+	| hex_literal
+	| octal_literal
+	...
+);
+decimal_literal = '((-?(\d+)(_\d+)*)|((-?(\d+)(_\d+)*)?(\.\d+(_\d+)*)))(e-?\d+(_\d+)*)?'
+binary_literal = '0b([01]+)(_[01]+)*'
+hex_literal = 'x([0-9a-fA-F]+)(_[0-9a-fA-F]+)*'
+octal_literal = '0o([0-7]+)(_[0-7]+)*'
+
+string_literal = '"[^\n"]"'
+
+list_literal = '[', [expression, {',', expression}], ']'
+dictionary_literal = '[', [dictionary_pair, {',', dictionary_pair}], ']'
+dictionary_pair = expression, ':', expression
+--

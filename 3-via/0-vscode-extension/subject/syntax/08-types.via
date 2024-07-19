@@ -1,0 +1,119 @@
+#########
+# Types #
+#########
+
+Types have names, and can have generic parameters, and fields.
+
+--via
+struct Vec2 {
+	Int x
+	Int y
+}
+--
+
+Fields with the same type can be separated by commas.
+
+--via
+struct Vec2 {
+	Int x, y
+}
+--
+
+Fields with different types can also be separated by commas.
+When declaring fields, field names are optional.
+There are also optional private and readonly sections.
+
+--via
+struct Ship {
+	Engine, Weapons, Structure
+	readonly {
+		MissionState missions
+	}
+	private {
+		Transform, Mesh
+	}
+}
+--
+
+Extending of other types is allowed.
+
+--via
+generic Content
+struct TextMessage[Content] {
+	extends Message
+	DateTime dt
+	Content
+	private {
+		String tag
+	}
+}
+--
+
+Types can also be abstract
+Types can also be enumerations with different cases.
+
+--via
+abstract enum Result[Content] {
+	ERROR
+	MESSAGE {
+		Content
+	}
+}
+--
+
+Finally, there are tag-types, which have no body - neither cases or fields.
+These can also be abstract.
+
+--via
+abstract type Enumerator
+--
+
+###########
+# Grammar #
+###########
+
+The grammar for all this is:
+
+--ebnf
+statement = (
+	...
+	| struct_definition
+	| enum_definition
+	| trait_definition
+	...
+);
+
+struct_definition = 'struct', type_name, generic_param_declaration, struct_body
+struct_body = '{', [struct_member, {struct_member_seperator, struct_member}], '}'
+
+enum_definition = 'enum', type_name, generic_param_declaration, enum_body
+enum_body = '{',  [enum_case, {enum_case_seperator, enum_case}], '}'
+
+trait_definition = 'trait', type_name, generic_param_declaration
+
+generic_param_declaration = ['[', type , {',', type}, ']']
+
+struct_member = (
+	| field_definition
+	| extension_declaration
+	| readonly_block
+	| private_block
+)
+struct_member_seperator = statement_separator
+
+field_definition = type, name
+extension_declaration = 'extends', type
+readonly_block = 'readonly', field_block_body
+private_block = 'private', field_block_body
+
+field_block_body = (
+	'{', [field_definition, {struct_member_seperator, field_definition}], '}'
+)
+
+case_definition = (
+	| const_name
+	| 'struct', const_name, struct_body
+	| 'enum', const_name, enum_body
+)
+enum_case_seperator = statement_separator | ','
+--

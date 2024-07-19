@@ -1,54 +1,150 @@
 module.exports = grammar({
+
     name: 'via',
-    extras: $ => [/[\t\f ]+/],
+    
+    ////////////////////////
+    // Ignored Whitespace //
+    ////////////////////////
+
+    // Notice that tabs and spaces are included below.
+    // But newlines aren't! This language is aware of newlines,
+    // they can end statements that are ready to end.
+
+extras: $ => [$.comment, /[\t ]+/],
+    ///////////
+    // Rules //
+    ///////////
+
     rules: {
-      // ################
-      // # Magic Fields #
-      // ################
-      //word: $ => $.identifier,
-      // ########################
-      // # Top Level Statements #
-      // ########################
+
+      //////////////////////////////////////
+      // Start Rule: Top-Level Statements //
+      //////////////////////////////////////
+      
+      // Notice that the optional skipping of newlines is defined at the start here.
+      // Merging adjacent rules isn't supported, so it's important not to double-up
+      // on these or errors regarding ambiguity occur. The rule of thumb followed is that
+      // sub-statements always handle any following whitespace-skipping as needed. This
+      // allows dealing with optional cases that would be hard to express otherwise.
+
       source_file: $ => seq(
-        repeat('\n'),
-        optional(seq(
-          $._top_level_statement,
-          repeat(seq($._separator, $._top_level_statement)),
-          repeat('\n'),
-        )),
+        optional($._newline),
+        optional($._statements),
+      ),
+
+      //////////////
+      // Newlines //
+      //////////////
+     
+      // One or more newlines, accounting for the Windows
+      // silliness with '\r' characters.
+      _newline: $ => repeat1(seq(optional('\r'), '\n')),
+
+      //////////////
+      // Comments //
+      //////////////
+
+      comment: $ => choice(
+        /#.*/,
+        seq(
+          '/*',
+          repeat(/./s),
+          '*/'
+        )
+      ),
+
+//      _block_comment: $ => /\/\*[^*]*\*+([^\/*][^*]*\*+)+\//,
+
+      ///////////////////////////
+      // Blocks and Statements //
+      ///////////////////////////
+
+      // Note that statements aren't divided into top-level/block
+      // in the grammar here. For now, there is actually no difference!
+
+      // But even if there was a difference - some being allowed, some not,
+      // it makes to ignore the distinction in the initial grammar, since 
+      // we can send back better errors by operating on the concrete syntax
+      // tree once it's ready.
+
+      _statements: $ => seq(
+        $._statement_line,
+        repeat(seq($._newline, $._statement_line)),
+        optional($._newline)
+      ),
+
+      _statement_line: $ => choice(
+        $._statement,
+        seq(repeat1($.block), optional($._statement))
+      ),
+
+      _statement: $ => choice(
+        $.function_call
       ),
 
       _separator: $ => choice(
-        ';', 
-        repeat1('\n')
-      ),
-
-      // For now, there is no difference between a block
-      // and top-level statement.
-      _top_level_statement: $ => choice(
-        $._block_statement
-      ),
-      // ###############################
-      // # Blocks and Block Statements #
-      // ###############################
-      // Note that expressions aren't block statements.
-      _block_statement: $ => choice(
-        $.block, // Blocks can be nested.
-        $.function_definition, $.function_call, 
-        $.if, $.foreach, $.while,
-        $.assignment
+        seq(';', optional($._newline)),
+        $._newline
       ),
 
       block: $ => seq(
         '{', 
-        repeat('\n'), 
-        optional(seq(
-          $._block_statement, 
-          repeat(seq($._separator, $._block_statement)),
-          repeat('\n')
-        )),
-        '}'
+        optional($._newline),
+        optional($._statements),
+        '}',
       ),
+
+      scope: $ => seq(
+        'scope',
+        $.block
+      ),
+
+      /////////////////
+      // Expressions //
+      /////////////////
+
+      _expression: $ => choice(
+        $.function_call,
+        $._numeric_literal,
+        $.name
+      ),
+
+      ////////////////////
+      // Function Calls //
+      ////////////////////
+
+      function_call: $ => seq(
+        $._expression, // Should there be a skip here?
+        '(', optional($._newline),
+        optional(seq(
+          $._expression,
+          optional($._newline),
+          repeat(seq(
+            ',', optional($._newline),
+            $._expression, optional($._newline)
+          ))
+        )),
+        ')'
+      ),
+
+      //////////////
+      // Literals //
+      //////////////
+
+      _numeric_literal: $ => choice(
+        $._decimal_literal,
+      ),
+
+      _decimal_literal: $ => /((-?(\d+)(_\d+)*)|((-?(\d+)(_\d+)*)?(\.\d+(_\d+)*)))(e-?\d+(_\d+)*)?/,
+
+      ///////////
+      // Names //
+      ///////////
+
+      name: $ => /[_a-z]+/,
+      type_name: $ => /[_A-Z][_a-zA-Z]*/,
+
+      /*
       // ########################
       // # Function Definitions #
       // ########################
@@ -152,7 +248,7 @@ module.exports = grammar({
       // #########################
       // # Identifiers and Types #
       // #########################
-      identifier: $ => /[a-z][a-z0-9_]*/,
+      identifier: $ => /[a-z][a-z0-9_]*//*,
       type: $ => /[A-Z][a-zA-Z0-9_]*/
     }
   });

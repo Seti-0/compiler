@@ -1,0 +1,30 @@
+=====
+Block
+=====
+
+# A plain ol' block.
+{}
+
+# Nested blocks.
+{ 
+    {
+    }
+}
+
+# Nested blocks on the same line.
+{{}}
+
+# Multiple blocks are allowed on the same line.
+{}{  }{       }
+
+---
+
+(source_file
+    (block)
+    (block
+        (block))
+    (block
+        (block))
+    (block)
+    (block)
+    (block))

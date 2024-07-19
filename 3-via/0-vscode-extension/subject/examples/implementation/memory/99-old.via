@@ -1,0 +1,125 @@
+##########################################
+# Allocating Memory for Function Returns #
+##########################################
+
+Function returns are the first tricky case that comes to mind.
+To avoid a copy/move, the function frame should be given a memory slot in the parent
+stackframe to write to.
+
+More generally, scopes could be considered blocks which have output memory slots.
+It's up to the caller to handle the allocation of output slots.
+Depending on how intermediate code works, other blocks might have memory slots as well.
+I don't know if it's possible to allocate on the stack within an if-statement, for example,
+or if all allocations need to be at the function level.
+
+--via
+def function() -> List {
+    x = List()
+    return x
+}
+let x = function()
+
+// Becomes 
+
+def function(Ptr[List]) {
+    construct(ptr)
+}
+x_ptr = stackalloc(List)
+function(x_ptr)
+drop(x_ptr)
+--
+
+The above is nice for deterministic memory, but is stack memory fixed per function frame?
+I guess I'd have to figure that out with LLVM.
+
+--via
+if condition {
+    let x = function(x_ptr)
+}
+else {
+    ...
+}
+
+x_ptr = stackalloc(List)
+if condition {
+    function(x_ptr)
+    drop(x_ptr)
+}
+else {
+    ...
+}
+--
+
+##############################
+# Aside: Circular References #
+##############################
+
+Notably, circular references within values aren't an issue - once the variable holding references to these values go out of
+scope, the lifetime of the group of values ends, no matter how much they reference each other.
+
+--via
+struct A {
+  B
+}
+
+struct B {
+  A
+}
+
+def function() {
+  let a = A()
+  let b = B()
+  a.b = b
+  b.a = a
+}
+--
+
+'a' and 'b' reference each other.
+But the only lifetimes that can be conferred to these through field references
+are the lifetimes of the local variables they are assigned to, so the circular reference
+does not lead to infinite lifetime.
+
+#########################################
+# Aside: Mutability and Reference-First #
+#########################################
+
+And one glaring issue is that of duplicate (shared) references to mutable values.
+In particular, if 'x' above can't be copied, then 'z = (x, x)' becomes a serious problem.
+More generally, if there are multiple slots with return-lifetime, the issue arises.
+
+Some thoughts:
+
+  > "Shared pointers" - anytime this comes up as a possibility default to shared pointers.
+     - Pro: this was the original plan, right?
+     - Pro: this is relatively simple.
+     - Pro: this could maybe be enriched by the other ones, in specific cases.
+     - Con: this might mean way more shared pointers than I had first envisaged.
+     - Con: static analysis for proving that two fields don't reference the same value
+            has suddenly become paramount!
+  
+  > "Boxing" - very similar to shared pointers, lighter maybe. In this case, the work-around
+               is to have a union with a pointer for every contained value (be it in a list, field, etc)
+               for which this potential duplicate scenario applied.
+       - Pro: lighter than shared pointers. For most types, this just requires an extra union-tag bit (or byte probably)
+       - Con: shares the remaining cons with shared pointers. In particular, static analysis
+              becomes paramount in avoiding this becoming the norm everywhere.
+       - Pro: In theory, we could forsake analysis and just make this the norm everywhere.
+
+  > "Unions" - a more aggresive version of "Boxing" - all values are made unions, instead of just contained ones.
+       - Pro: might be simpler to implement.
+       - Con: aside from implementation complexity, this seems objectively worse.
+
+  > "Attached Memory" - carefully tailor data structures like lists or dictionaries to separate pointers
+                        from value memory. 
+       - Con: this isn't really a solution, since it doesn't do anything for structures.
+       - Pro: it might be a useful optimization on top of other solutions, for standard library containers.  
+
+Whatever approach is used, the most important factor in how big a problem this is is 
+how well static analysis can avoid the situation in the first place.
+
+Finally, it might (might!) mean that shared pointers are the norm for mutable values across
+library boundaries.
+
+
+
+

@@ -1,0 +1,176 @@
+###################
+# Paths and Names #
+###################
+
+A path in via syntax is a series of names separated by dots, typically.
+There are a few different kinds.
+
+Firstly, variables and functions are interesting because they can be accessed
+via several ways - through the local namespace, or a named namespace, or a
+field on an instance, or any combination of these.
+
+--via
+# Namespaces
+namespace
+namespace.namespace
+
+# Variables
+variable
+namespace.variable
+namespace.namespace.variable
+instance.field
+namespace.instance.field.field
+
+# Functions
+function
+namespace.function
+namespace.instance.field.function
+
+# Types
+var Type
+GenericType[var T, U]
+var namespace.GenericType[T]
+
+# Cases
+Type.CASE
+namespace.Type.CASE
+# Question: do we need to consider var here as well?
+var Type.CASE
+--
+
+From a syntactical point of view, this is simpler than it looks.
+Simply because namespaces, fields, functions, and variables all share the name
+symbolic namespace - they are all just snake_case identifiers.
+
+So a path to a variable or a function is always just a period ('.') delimited
+sequence of snake_case names. This assumes that types can't be associated with
+variables or functions, in which case the following cases are added.
+
+--via
+# Variables
+Type.variable
+namespace.Type.variable
+namespace.GenericType[T].variable
+namespace.GenericType[T].variable.field.variable
+
+# Types
+Type.function
+namespace.Type.function
+namespace.GenericType[T].function
+namespace.GenericType[T].variable.field.function
+--
+
+While it might be that I don't go for type variables/functions, it might be a good idea
+to have the parser recognize the pattern in any case, for the sake of error tolerance.
+
+####################
+# Expression Paths #
+####################
+
+Some statements (assignments, I'm looking at you!) are paths that can begin with an arbitrary expression.
+I'm not sure how to handle those yet.
+
+But obviously not all expressions are valid assignment targets.
+While it makes sense for the parser just to take the expression and validate later, I think it's worth considering 
+what valid expression paths there are.
+
+--via
+# If the expression is an indexable type.
+expression[index] = ...
+
+# If the expression has assignable fields.
+expression.field = ...
+--
+
+####################################
+# Aside: Referencing Complex Types #
+####################################
+
+From an ergonomics point of view, it could be attractive to reference
+certain types using maths-like friendlier notation.
+For example:
+
+--via
+# Function Type
+(var T) -> U
+
+# Tuple Type
+(T, U)
+
+# Option Type
+T | (var U)
+
+# Combination thereof.
+(T | (var U -> X)) -> var (V, W)
+--
+
+While these would be very nice in some cases, they would complicated the syntax quite a bit
+and I think the less sexy but pragmatic square-brackets syntax is good enough for now.
+THOUGH, NOTE: I have no idea what to do about mutability here yet.
+
+--via
+# Function Type
+Fn[var T, U]
+
+# Tuple Type
+var Tuple[T, U]
+--
+
+#############################
+# Aside: Generic Parameters #
+#############################
+
+It might be desirable, for metaprogramming purposes, to allow runtime type names
+as generic parameters. However, it might also be desirable to use different syntax
+for that. Not sure yet.
+
+--via
+my_type = meta.create_generic(List, input_type)
+
+# Alternatively, less verbose:
+my_type = List[input_type]
+--
+
+The reason this is relevant here is because this would promote the contents
+of generic arguments to being full expressions, as opposed to merely paths.
+For example:
+
+--via
+my_type = List[get_my_type(1 + x.len())]
+--
+
+##########################
+# Back to Paths: Grammar #
+##########################
+
+I'm not sure if any syntactical structures actually need to disambiguate between type
+paths and variables paths for the parsing to AST stage. Each expects exactly one or the other,
+and error-handling after parsing should probably report an error here.
+
+So the only thing we really need to do here is consider a general grammar for paths, and types.
+
+It could look like:
+
+--ebnf
+qualified_type = ['var'], path
+
+path = path_element, {'.', path_element}
+path_element = name | generic_type_name
+
+generic_type = type_name, ['[', qualified_type, {',', qualified_type}, ']']
+
+name = snake_name
+type_name = pascal_name
+
+
+snake_name = '_*[a-z][a-z_0-9]*'
+pascal_name = '_*[A-Z][A-Z_a-z0-9]*'
+screaming_case = '_*[A-Z][A-Z_]'
+--
+
+Note that there is overlap between screaming and pascal case names.
+For example, X is of both, as is ID.
+But there is no overlap between snake_case and pascal_case, which is done on purpose.
+
+Also note that ____0 is specifically not a valid name - there has to be a letter
+to identify it as pascal or snake case.

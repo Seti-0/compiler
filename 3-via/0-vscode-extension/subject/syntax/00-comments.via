@@ -1,0 +1,36 @@
+#########
+# Intro #
+#########
+
+Just what one would expect from languages with comments.
+The one special bit is nesting multiline comments, similar to racket or rust.
+
+Note the use of '#'.
+I do like '//', but I also like integer division syntax, so '#' it is.
+
+############
+# Examples #
+############
+
+--via
+# Simple comments
+
+/*
+    Multiline comment.
+    /*
+        Nested multiline comment!
+    */ 
+*/
+
+# Some edge cases:
+#
+/**/
+/* */
+/****/
+--
+
+###########
+# Grammar #
+###########
+
+Not sure yet!

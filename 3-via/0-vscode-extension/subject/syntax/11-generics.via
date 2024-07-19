@@ -1,0 +1,33 @@
+############
+# Generics #
+############
+
+Despite being a mechanically heavy feature, there is little syntax
+specifically associated with generics.
+
+Once declared, generic types are, from a purely syntactical point of view, types like any other.
+
+--via
+generic T, U <: Real
+default T = Object
+--
+
+###########
+# Grammar #
+###########
+
+The grammar is:
+
+--ebnf
+statement = (
+	...
+	generic_declaration,
+	generic_default,
+	...
+);
+
+generic_declaration = 'generic', generic_case, {',', generic_case}
+generic_case = type_name, ['<:', qualified_type]
+
+generic_default = 'default' type_name = qualified_type
+--

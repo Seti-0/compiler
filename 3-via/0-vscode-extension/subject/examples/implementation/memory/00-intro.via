@@ -1,0 +1,117 @@
+##########
+# Memory #
+##########
+
+I've been pondering memory allocations strategies.
+The basic idea is to use linear allocation (unique pointers) where possible,
+and then fall back to shared (refcounted) pointers where not, for now.
+
+More advanced strategies can be implemented later.
+There is also the question of user-control, tailoring, but I'll not worry about
+that just yet. I'll just keep in mind that I do want that eventually.
+
+#####################
+# Recap: Approaches #
+#####################
+
+There are different ways of thinking about this I've come across.
+I'm keeping them here for posterity, I'm only using the latest one
+at any given time I guess.
+
+The first is to consider pointers, and malloc/free.
+For example:
+
+--via
+let a = Item()
+{
+    let b = Item()
+    a = b
+}
+
+// Could become
+
+a_ptr = stackalloc(Item)
+b_ptr = stackalloc(Item)
+
+construct(a_ptr)
+construct(b_ptr)
+drop(a_ptr)
+a_ptr = b_ptr
+
+drop(a_ptr)
+--
+
+A slight variant on the above is to look at values separately from variables.
+They need to come into existance before being used, and can leave any time after.
+This is kind of like a static reference count.
+It's interesting, but it's also very verbose and heavy to think about even for simple cases!
+
+--via
+let a = Item()
+{
+    let b = Item()
+    a = b
+}
+
+// Tracking values
+
+let a = <A:>
+<A:> -> <A:a>
+<stackalloc A>
+<construct A>
+{
+    let b = <B:>
+    <B:> -> <B:b>
+    <stackalloc B>
+    <construct B>
+
+    a = b
+    <A:a> -> <A:>
+    <B:b> -> <B:b,a>
+    <drop A>
+
+    drop b
+    <B:b,a> -> <B:a>
+}
+drop a
+<B:a> -> <B:>
+<drop B>
+--
+
+I then starting thinking, at a higher level, about the places these values could live.
+I had the notion of "slots". For example:
+
+--via
+def function() {
+  let x = Item()        // A slot on the stack in this stackframe.
+  let y = [x]           // A slot on the heap. Same lifetime.
+  return x              // An output slot for the function. Lifetime unbounded!
+}
+--
+
+This allowed me to express difficult problems that weren't immediately obvious previously.
+For example, this is a mess:
+
+--via
+def function() {
+    let x = MutableItem()
+    return (x, x)
+}
+--
+
+The next approach I had was to look at the types of thing.
+This started to look a lot like Rust very quickly...
+
+--via
+let a :: val'local:Item = Item()
+let x :: val'local:List[val'local:Item] = List(Item)
+for i in range(10) {
+    add(x -> ref'temp:List[val'local:Item], a -> val'local:Item)
+}
+--
+
+This is verbose, but feels a lot lighter to think about that the value one.
+I guess I'm used to thinking in these terms?
+Also, while it looks like Rust, I think it's actually my time with C++ that
+makes this familiar. I guess that makes sense since Rust was made with improving
+C++ in mind.

@@ -1,0 +1,128 @@
+##############
+# Whitespace #
+##############
+
+The language is whitespace aware!
+Only newlines are considered. They can delineate statements.
+All other whitespace only serves to delineate words.
+
+I'd like the grammar to be white-space ambivalent, and for the newline-awareness
+to be encoded in a general rules. Specifically, I had two conditions in mind:
+
+  - COMPLETENESS: An AST item can only be terminated by a newline, if it is complete.
+    i.e. it requires no further tokens.
+
+  - COMPATIBILITY: An AST item can only be terminated by a newline, if tokens after the
+    newline aren't an option when continuing the parse the AST item.
+    i.e. it doesn't make sense to join the lines.
+
+The first rule could be encoded in the grammar, messily.
+The second, I'm not sure about.
+Either way, it makes most sense to me to encode it more directly and generally into the parser, separate to the grammar.
+
+Note that this means the parser has to be LL(2).
+My intent is to make the grammar LL(1) aside from this one place.
+
+Also, this will be interesting when trying to deal with error tolerance, but we'll cross that bridge when we come to it!
+
+############
+# Examples #
+############
+
+Statements separated (and thus terminated) by a newline.
+
+--via
+print("This is one statement")
+print("This is a second, they are delineated by a newline")
+--
+
+Statements not terminated by a newline, via the completeness rule.
+The second example shows that this rule is more far-reaching than one might first think.
+
+--via
+print(
+	"This is one statement across multiple lines"
+)
+
+if 
+name
+eq
+2 
+{
+point
+(
+NORTH
+)
+}
+--
+
+Finally, a statement not terminated by a newline, despite being complete.
+This is an example of the second rule, compatibility.
+
+--via
+name()
+eq
+2
+--
+
+Though strictly speaking, the above is NOT valid via, since expressions can't be statements.
+For the sake of error tolerance, the parser should be able to see that this is an expression.
+But that being said... is there ever a case where this rule could apply for a valid program?
+
+I guess and obvious example might be a using statement.
+The example below is only valid with the rule.
+Of course, this is more a reason NOT to have the rule, since it's bad formatting.
+
+--via
+using X
+, Y
+--
+
+So... is there an example of good formatting making use of this rule?
+I like the next example with generics.
+
+--via
+generic T, U
+as Real
+--
+
+Obviously this *could* be done without rule 2 just by allowing "as _" as a statement that
+can come after a generic statement. Similar to an if/else.
+But... it comes for free with the rule, and allows the grammar to be simpler.
+It means that "as Real" doesn't have a meaning on its own.
+
+Speaking of...
+If-else syntax is made simpler by the rule I think.
+
+--via
+if ... {
+
+}
+else {
+    
+}
+
+if ... {
+
+} else {
+    
+}
+--
+
+It has the disadvantage of introducing a conflicting style though.
+Still, that could maybe be dealt with by an opinionated styler.
+And besides, I don't really want the language to be restrictive with whitespace.
+
+The rule also makes easy allowance for the following scenario:
+
+--via
+def test()
+
+def test()
+{
+
+}
+--
+
+Where "def test()" on its own is valid.
+I don't know if it would be valid, but it's a nice flexibilty to have.

@@ -1,0 +1,37 @@
+{
+  "name": "via",
+  "displayName": "Via",
+  "description": "Support for the via programming language",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "via",
+        "aliases": [
+          "Via",
+          "via"
+        ],
+        "extensions": [
+          ".via"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "via",
+        "scopeName": "source.via",
+        "path": "./syntaxes/via.tmLanguage.json"
+      }
+    ]
+  },
+  "devDependencies": {
+    "js-yaml": "^4.1.0"
+  }
+}

@@ -1,0 +1,102 @@
+####################
+# Dispatch: Traits #
+####################
+
+Traits are a form of polymorphism quite different from inheritence.
+They have the following properties:
+
+    Traits contain NO DATA. 
+    This is key for late membership definition!
+    They can contain getters, they just don't decide where data lives.
+
+    The trait, trait implementation, and implementation can all
+    be defined in 3 different compilation units.
+    Note: This is different from Rust, which requires 2 compilation units at most, there.
+
+##########################
+# Aside: Late Definition #
+##########################
+
+By late definition, I mean something that is added in a different unit of compilation.
+This means that the compiler must compile the item to be later extended without any knowledge
+that it might be extended. And the compiler must implement the extension without altering
+the original implmentation.
+
+##########################
+# Aside: Traits and Data #
+##########################
+
+Traits can have getter methods, so they can enforce the presence of data.
+However, they cannot *add* data. This is necessary for late definition to work, since otherwise
+the layout of the original type would change and the compiler would have to recompile all other
+translation units that use it.
+
+It's definitely possible to require that recompilation, but... it seems like an unacceptable cost for me.
+I'd like to avoid needing to statically recompile everything while in debug mode at least.
+Preferably even in release.
+
+#######################################
+# Approaches: Compile-time Templating #
+#######################################
+
+The static approach is to template the code for every instance implementing the trait.
+This is Rust approach. It means the compiler knows the concrete type, and place function
+calls to the implementing type the same way it would place functions normally.
+This is the Rust approach.
+
+    - PRO: No runtime overhead.
+    - PRO: No runtime memory overhead.
+    - CON: Longer compile times. (This is the big one!)
+    - CON: Larger binary size.
+    - CON: Requires new compilation of library functions if the trait is in a library.
+
+The static approach is optimal in a certain sense, but I'd argue only in niche situations.
+Such as when the trait is local the translation unit and doesn't have many implementations.
+Or when making a final shipping build and trying to squeeze out every ounce of runtime 
+instruction efficiency.
+
+However, needing to recompile library functions is a potentially huge cost.
+And needing to compile large amounts of code for every trait implementation is very wasteful.
+Hence, the dynamic method is what I'd see being the default outside of optimizations.
+
+####################################
+# Approaches: Runtime Table Lookup #
+####################################
+
+The dynamic approach is to have a table-lookup, similar to inheritence.
+So the table couldn't in general be stored in-line with the rest of the data
+of the instance.
+
+Instead, either a wrapper type should be passed to the function (with pointers
+to both the original instance, and to the trait lookup table), or, a pointer
+to the table could be passed as a separate argument (in general, passing data
+alongside an instance is called using "fat" pointers)
+
+Either way, the pros/cons are:
+
+    - PRO: faster compiles, no recompilation of library functions needed.
+    - PRO: fully general - less need for static analysis
+    - PRO: smaller binary size
+    - CON: runtime overhead with data/function-pointer lookup
+
+While the runtime overhead is not insignificant in that I expect there to be a lot of traits,
+I still think this is a better default behaviour for the compiler. The ideal then would 
+be that the compiler selectively applies templating as an optimization.
+
+
+
+
+
+
+This means that the table needs to be passed around along with the type.
+There are two ways to do this: either create a wrapper type that contains two pointers, one
+to the lookup and one to the instance, 
+
+The dynamic approach 
+
+
+    - PRO: Simple
+    - PRO: 
+
+Because traits can be defined and implemented late
+

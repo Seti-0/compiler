@@ -1,0 +1,19 @@
+========
+Comments
+========
+
+#{}
+
+# Hi
+# These should be ignored!
+
+/* 
+Along with this 
+*/
+
+/**/
+/*/* */*/
+
+---
+
+(source_file)

@@ -1,0 +1,132 @@
+###################################################
+# Dynamic Dispatch: Extension, Traits, Reflection #
+###################################################
+
+Obviously, if concrete types can be inferred by static analysis,
+it would be better to pass data around without reflection information.
+However, especially with library code, that is definitely not
+teneble in general. Some kinds of object, extendable ones, have to
+come with same machinary to enable runtime inspection of their
+full nature.
+
+--via
+struct Vector2 {
+    meta {
+        TypeInfo
+    }
+    Int x, y
+}
+
+print(Hello)
+--
+
+#################################
+# Relationship to Memory Layout #
+#################################
+
+Two approaches:
+
+    Memory layout and runtime additions are determined as one.
+
+    Runtime additions are added first, before memory layout is determined.
+
+I'd like the second option for now, for simplicity of implementation, if possible.
+The first probably allows additional optimizations, but my feeling is 
+that the optimizations it would affort would not be dramatically important.
+
+Note that embellishing of types with additional information cannot happen
+after memory layout is determined, obviously, since it impacts the size
+of objects in memory and the memory layout pass needs the final version of that.
+
+#########################
+# Extensions vs. Traits #
+#########################
+
+Extension is an easier problem in a way, because of two things:
+
+    - The inheritence must be declared upfront, with the definition of the type.
+
+    - Multiple inheritence isn't a goal yet.
+
+Frankly, the second point isn't all that important, though of course it simplifies the implementation.
+The first point is the important bit. The final memory layout of a type with a supertype
+can be determined based on its declaration.
+
+The challenge with extension is being able to pass a pointer to the memory of the instance
+to either a function that takes the parent, or a function that takes the child, without causing issues.
+
+One approach (similar to that by C++) is the following:
+Note that C++'s version is more complicated due to multiple inheritence.
+
+--ebnf
+#################
+# PARENT LAYOUT #
+#################
+
+meta         # Used for dynamic reflection. Could be omitted if not needed. 
+a_lookup     # Points to a's virtual functions.
+a_data       # Same as in a normal non-virtual type.
+
+# Note that a_lookup here is known at compile-time, same as all the lookups.
+# So in that sense it seems useless.
+# But it becomes important with child classes, since a function expecting the above
+# can also act on an instance of a child, with the child being allowed to change 
+# that table so that functions can be overriden.
+
+# Note that there is no such thing as overriding data here.
+
+# Note that for dynamic reflection, a_meta is an instance of meta info.
+
+
+################
+# CHILD LAYOUT #
+################
+
+# The key here is that the first block of data is indentical to the parent.
+# So the same pointer can just be passed.
+
+meta             # Again, slot for dynamic reflection. This time it contains info about the child.
+a_lookup         # Same layout as before, but some entries are different, for child overrides.
+a_data           # Exact same as parent.
+b_lookup         # Again, useless unless there is a child class of the child.
+b_data           # Functions on the parent don't care about this. Only child functions and overrides do.
+
+######################
+# FINAL CHILD LAYOUT #
+######################
+
+meta            # Same as usual.
+a_lookup        # Again, same layout, potentially different entries.
+a_data          # Same.
+b_lookup        # Same layout, potentially different entries.
+b_data          # Same.
+c_data          # Only functions on this child need to know about this.
+
+# Note that c, the final child, has no lookup table for its functions!
+# There is no need, new functions defined on c aren't virtual by extension.
+--
+
+############################################
+# Simple Cases: Final Child, No Child Data #
+############################################
+
+Using the same rules as before, we can see it's nicely pay-for-what-you-use.
+For example, in this case, 
+
+--ebnf
+##########
+# Parent #
+##########
+
+meta
+a_lookup
+a_data
+
+###################################
+# Final Child, no additional Data #
+###################################
+
+meta
+a_lookup
+b_data
+--

@@ -1,0 +1,104 @@
+#############
+# Variables #
+#############
+
+"let" and "var" are used for variable declation.
+There might also be "mut" and "ref", but I'm not sure.
+
+--via
+let x = 9
+var y = 3
+--
+
+Variables can be forward declared without being initialized.
+
+--via
+let x
+if compute_root {
+	x = compute_absolute_position()
+}
+else {
+	x = 0
+}
+--
+
+No keywords are required for assignment.
+This is pretty important where LL(1) is concerned!
+
+--via
+x = 5
+--
+
+There are tuple assignments:
+
+--via
+x, y = y, x
+
+x = (1, 1)
+y, z = x
+
+x, y = Vec2.ZERO
+--
+
+##################################
+# Aside: Explicit Deconstruction #
+##################################
+
+One could also have explicit structural deconstruction.
+Maybe as an alternative to implicit deconstruction-to-tuple.
+It's obviously less write-friendly, but it might be more read/refactor-friendly? I don't know.
+I usually don't like implicit conversions.
+
+--via
+let Vec2(x, y) = Vec2.ZERO
+Vec2(x, y) = Vec2.ZERO
+--
+
+Alternatively, an explicit but verbose option would be:
+
+--via
+x, y = Vec2.ZERO.to_tuple()
+--
+
+##########################################################
+# Aside: Expressions, Name Paths, and Assignment Targets #
+##########################################################
+
+An 'assignment target' is something that can go to the left of an '='
+sign, pretty much. It occurs to me that this can be a full blown expression.
+
+For example, this should be valid:
+
+--via
+get_latest_target(current_time*time_to_seconds).hit_count += 1
+--
+
+So... assignment targets are expressions.
+Not all expressions are valid, but that is for the validation step after parsing.
+This makes tuples complicated too, since equivalence regarding implicit deconstruction
+on the right hand side and tuple types on the left hand side is needed, presumably.
+
+--via
+x, y = 1, 2
+--
+
+###########
+# Grammar #
+###########
+
+Notice that assignment targets and declaration targets are very different below!
+One is just a general expression. The second is much more restrictive.
+
+--ebnf
+statement = (
+	...
+	variable_definition,
+	variable_assignment
+	...
+);
+variable_definition = ('let'|'var'), variable_declaration_target, ['=', expression]
+variable_assignment = variable_assignment_target, '=', expression
+
+variable_assignment_target = expression
+variable_declaration_target = name, {',', name}
+--

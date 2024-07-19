@@ -1,0 +1,11 @@
+#################
+# Lookup Tables #
+#################
+
+TODO:
+How does one implement efficient static lookup tables?
+For things like switch statements, or virtual function lookups.
+
+There is a term "minimal perfect hashing function" that seems relevant.
+See https://cmph.sourceforge.net/
+More generally, minimal hash functions.

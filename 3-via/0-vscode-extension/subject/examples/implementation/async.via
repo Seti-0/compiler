@@ -1,0 +1,14 @@
+######################
+# Fibres and Threads #
+######################
+
+I don't have much to say about this yet, except that an async go-like runtime would be ideal.
+
+The obvious case for context-switching is IO.
+Or, when dealing with a lot of work, there is also multi-core programming.
+
+One much less obvious form of context-switching is page faults.
+I don't know how important this is since the computer can switch to other tasks in any case.
+But I found it interesting that even if you are doing no IO, if you have no 
+obvious form of concurrency, a simple memory access might cause the OS
+to context-switch.

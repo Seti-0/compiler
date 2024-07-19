@@ -1,0 +1,147 @@
+####################
+# Vec2 Definitions #
+####################
+
+Experimenting with structs and generics here!
+
+--via
+using meta.ops
+
+generic T <: Number
+
+struct Vec2[T] {
+    T x, y
+}
+
+default Vec2 = Vec2[F64]
+
+########################
+# Associated Constants #
+########################
+
+# Implmenting these lines would be trickier than it first seems,
+# since Vec2 is templated. One question is when and how much to instantiate,
+# especially if this is a library with the type exported to unknown code.
+
+let Vec2.ZERO   = Vec2(0, 0)
+let Vec2.ONE    = Vec2(1, 1)
+let Vec2.UNIT_X = Vec2(1, 0)
+let Vec2.UNIT_Y = Vec2(0, 1)
+
+######################
+# Operator Overloads #
+######################
+
+# The simplest approach is to do each separately...
+# There are 12 of these, for add/sub/mul/div, and then the same
+# with scalars from the left and right. 15 if truediv is included.
+# It could be reduced to 8 if there was a syntax for commuting.
+
+# Then there is a set of these 12/15 functions for each of 
+# Vec2, Vec3, Vec4, Mat2, Mat3, Mat4, etc.
+# That's a lot of functions! But it's a once-off thing, so not too concerning.
+
+# Still, that all assumes one numerical type, I don't know if more would be needed
+# for different numerical types, or if upcasting and such could handle the conversions
+# implicitly.
+
+def ops.add(Vec2 a, b) -> Vec2 {
+    return Vec2(a.x*b.x, a.y*b.y)
+}
+
+...
+
+# Could these be inlined and templated?
+# Can that be done without tanking compile times?
+# I don't think I'll know until I try implement it, way down the line.
+
+# There is also lots of subtle complexity here with different numerical
+# types and promotions/conversions and compatibility with generics.
+# I have no idea how any of that will pan out.
+
+# Finally, there is one non-technical issue here.
+# This compose might allow too much - if there was a power operator
+# I wouldn't want to apply that to vectors, here.
+
+def ops.compose(Vec2[T] a, Vec2[T] b, Function[T, T] op) -> Vec2[T] {
+    return Vec2(op(a.x, b.x), op(a.y, b.y))
+}
+
+def ops.compose(T a, Vec2[T] b, Function[T, T] fn) -> Vec2[T] {
+    return Vec2(op(a, b.x), op(a, b.y))
+}
+
+def ops.compose(Vec2[T] a, T b, Function[T, T] fn) -> Vec2[T] {
+    return Vec2(op(a.x, b), op(a.y, b))
+}
+
+# This would be even shorter, for defining scalar ops.
+# But it seems harder to optimize!
+#
+# def ops.promote(T a, type Vec2[T]) -> Vec2[T] {
+#     return Vec2(a, a)
+# } 
+
+#########################
+# Other Math Operations #
+#########################
+
+# Doing math operations generically over 
+
+def len(Vec2[T] a) -> T {
+    return math.sqrt(a.x*a.x + a.y*a.y)
+}
+
+def len2(Vec2[T] a) -> T {
+    return a.x*a.x + a.y*a.y
+}
+
+def transpose(Vec2 a) -> Vec2 {
+    return Vec2(a.y, b.x)
+}
+
+def perp(Vec2 a) -> Vec2 {
+    return Vec2(-a.y, a.x)
+}
+
+def dot(Vec2[T] a, b) -> T {
+    return a.x*b.x + a.y*b.y
+}
+
+##################################
+# Generalizing Vector Dimentions #
+##################################
+
+# This is a pure curiosity!
+# I don't the abstraction here would ever be worth the 
+# compile-time implementational complexity and computational overhead.
+
+# Some math, with dots and crosses and such, can be done
+# the same in any number of dimensions. We don't have to worry
+# about any dimensions other than 2 and 3, but it's still interesting.
+
+generic T <: Number
+struct Vec3[T] {
+    T x, y, z
+}
+
+default Vec3[T] = Vec3[F64]
+
+abstract type Vec
+default Vec = Vec2
+
+abstract len(Vec)
+abstract len2(Vec)
+abstract normalize(Vec)
+abstract normalized(Vec)
+abstract dot(Vec a, b)
+abstract cross(Vec a, b)
+
+def Vec(Number x, y) {
+    return Vec2(x, y)
+}
+
+def Vec(Number x, y, z) {
+    return Vec3(x, y, z)
+}
+--

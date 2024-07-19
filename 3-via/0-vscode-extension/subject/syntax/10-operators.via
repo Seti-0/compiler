@@ -1,0 +1,85 @@
+############################
+# Operators and Precedence #
+############################
+
+All operators are left-associative.
+Unary operators have highest precedence, always.
+
+--via
+not
+--
+
+Binary operators, by precendece, are in the table below.
+
+--via
+as
+*       /       mod
++       -
+>       >=      <        <=
+eq      neq     is       is not
+and     or
+,
+--
+
+Aside: is the cast operator really needed?
+A simple function call might be enough, syntactically.
+
+--via
+let x = 34.cast(Float)
+let x = cast(34, Float)
+let x = 34 as Float
+--
+
+Notice that separate symbols are not given for bitwise logic.
+The type system is used there instead.
+
+--via
+true or false   # Logical operation, and it's short-circuited.
+43 or 2         # Bitwise operation, and it's not short-cicuited.
+--
+
+Chained comparisons are not supported. 
+For example: 4 < 5 < 6 produces a syntax error, since a number and boolean cannot be compared.
+
+############
+# Grouping #
+############
+
+Round brackets can be used to change the order of operations. 
+
+--via
+(x + 4) as Float 
+--
+
+###############################
+# Custom Operator Definitions #
+###############################
+
+It is not possible to declare new operators, like % or ~.
+It is however possible to define the behaviour of an existing operator on a new type.
+This does not require any new syntax!
+
+--via
+using meta.ops
+
+def ops.add(Vec2 a, b) {
+    return Vec2(a.x + b.x, a.y + b.y)
+}
+--
+
+###########
+# Grammar #
+###########
+
+Expressions and operators will use Pratt parsing, I expect.
+So that means not worrying about grammar definitions in EBNF.
+The grouping has a simple grammar, though.
+
+--ebnf
+expression = (
+    ...
+    | group
+    ...
+);
+group = '(', expression, ')'
+--

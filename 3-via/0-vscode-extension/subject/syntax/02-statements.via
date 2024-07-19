@@ -1,0 +1,109 @@
+#########
+# Intro #
+#########
+
+Statements are the basic elements of a program.
+They can appear at the top-level of the program, or in blocks - functions, loops, etc.
+There is no distinction between statements allowed at top-level and statements allowed in blocks!
+This means local functions and types and imports are allowed.
+
+A simple example statement.
+In this code, there is an expression (the condition), a block (the if-statement body), and a statement. (The function call)
+
+--via
+if x eq 2 {
+    point(NORTH)
+}
+--
+
+Blocks in themselves are statements, and can be nested.
+
+--via
+{
+    {
+        super_secret_call()
+    }
+}
+--
+
+However, note that a block is a block, and cannot be substituted for other statements where explicitly required.
+For example, an if statement must have a block body, it can't have a body that is just a plain statement.
+
+##########################
+# Aside: One-Line Blocks #
+##########################
+
+In some rare cases in the language, one-line blocks are allowed.
+I don't really want this to be a general thing, though there might be an argument for allowing
+it in most cases.
+
+--via
+return match x
+case 3: "iii"
+case 4: "iv"
+
+let camera =
+    if focus: Camera.FRONT
+    else: Camera.FAR
+--
+
+One reason I don't want to allow it else where is because the following becomes possible
+and extremely misleading. It looks like Python, but what is really happening is that the return statement
+is *outside* the if statement, indentation is meaningless and a newline is allowed before the one-line block.
+
+--via
+if true:
+    log.info("done!")
+    return
+
+// The above is actually equivalent to:
+if true {
+    log.info("done!")
+}
+return
+--
+
+This is obviously pretty bad, and it's enough to make a me reconsider the whole thing.
+The issue exists with match blocks too!
+
+--via
+match x
+case 3: 
+    log.info("Is this being reached?")
+    return "iii"
+case 4: return "iv" // ERROR - syntax - case not preceded by match or another case!
+
+// This is because the one-line-block syntax means the above is equivalent to:
+match x
+case 3 {
+    log.info("Is this being reached?")
+}
+return "iii"
+case 4: return "iv" // ERROR! It's more obvious why now.
+--
+
+
+###########
+# Grammar #
+###########
+
+The grammar looks something like:
+
+--ebnf
+source_file = [
+    statement, {statement_separator, statement}
+];
+statement_separator = ';' | ('\n', {'\n'});
+
+statement = (
+    block,
+    ...
+);
+
+block = '{', [
+    statement, 
+    {statement_separator, statement}
+], '}';
+--
+
+Statement isn't fully defined above, it would have many entries!

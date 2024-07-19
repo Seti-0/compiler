@@ -1,0 +1,76 @@
+################
+# Control Flow #
+################
+
+If statements.
+
+--via
+if option.visible and option.score > 10 {
+	option.select()
+}
+--
+
+Loops.
+
+--via
+while true {
+	main_loop()
+	if condition() {
+		break
+	}
+	else {
+		continue
+	}
+}
+
+for i in range(4) {
+	launch_process()
+}
+--
+
+#############################
+# Aside: Multi-Level Breaks #
+#############################
+
+Note: some languages have a multi-level break, that seems occasionally quite useful.
+An example language here is PHP. Java also has related labelled breaks.
+There is a lovely summary of different approaches in PEP 3136 – Labeled break and continue .
+It was rejected by Guido, Python doesn't have this feature.
+
+--via
+while true {
+	while true {
+		break break
+	}
+}
+--
+
+Obviously adding a number after 'break' would be neater than duplicating break.
+However, that would raise the obvious possibility of having dynamic vs. static breaks,
+which I've never seen a use for and could be very abusable.
+
+All in all, I don't think I'll add this, but I found it interesting enough to warrant thought
+and a mention.
+
+###########
+# Grammar #
+###########
+
+--ebnf
+statement = (
+	...
+	if_statement,
+	while_loop,
+	for_loop,
+	break,
+	continue,
+	...
+);
+
+if_statement = 'if', expression, block
+while_statement = 'while', expression, block
+for_loop = 'for', variable_declaration_target, 'in', expression, block
+
+break = 'break'
+continue = 'continue'
+--

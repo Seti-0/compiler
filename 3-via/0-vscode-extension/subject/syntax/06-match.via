@@ -1,0 +1,98 @@
+####################
+# Match Statements #
+####################
+
+Match statements.
+This is a more elaborate form of conditional control flow when compared to if-statements.
+
+--via
+match type msg
+case Discovery {
+	...
+}
+case HostGame: ...
+default: log(UNKNOWN_MSG, msg)
+--
+
+Note the ':' being allowed instead of a block.
+This is unique to match statements currently, if/def/for/etc can't use it.
+It's also BROKEN! See 02-statements. I need to figure out a different rule here.
+
+Note the lack of 'break' statements.
+Fallthrough after behaviour is not allowed.
+Fallthrough is possible, when no body for a case is declared.
+
+--via
+return match focus
+case COCKPIT
+case RADAR
+case CANARDS: FRONT
+default:      FAR
+--
+
+Matching can be done on values, types, or enum cases.
+The syntax is different for each case, currently.
+They can be probably unified?
+One open question I don't have an answer to is the nature of an enum value.
+Does 'building' below have the type RADAR_STATION? Or the value RADAR_STATION? 
+Enums seem to blur the two.
+
+--via
+match command
+case "hold"
+case "advance"
+...
+
+match enum building
+case RADAR_STATION
+case POWER_PLANT
+...
+
+match type vehicle
+case FighterJet
+case LunarLander
+...
+--
+
+For the type, at least, different syntax is needed.
+Otherwise the object would be matched as a type against types, which also would be a compile-error
+if the object wasn't a type.
+
+--via
+match type obj
+case Vec2 {
+	return obj.x + obj.y
+}
+default: pass
+
+match obj.get_type()
+case Vec2 {
+	return obj.x + obj.y
+}
+default: pass
+--
+
+###########
+# Grammar #
+###########
+
+A grammar for most of the above is below.
+The main thing missing is the ':' syntax, since that is BROKEN
+and I don't know what to do with it yet.
+
+--ebnf
+statement = (
+	...
+	match_statement,
+	match_enum_statement,
+	match_type_statement
+	...
+);
+
+match_statement = 'match', match_body
+match_enum_statement = 'match' 'enum', match_body
+match_type_statement = 'match' 'type', match_body
+
+match_body = {match_case}, match_default
+match_case = 'case', expression, block
+match_default = 'default', block

@@ -1,0 +1,314 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Via",
+  "patterns": [
+    {
+      "include": "#headersnippets"
+    },
+    {
+      "include": "#viasnippets"
+    },
+    {
+      "include": "#ebnfsnippets"
+    },
+    {
+      "include": "#regexsnippets"
+    },
+    {
+      "include": "#plaintext"
+    }
+  ],
+  "scopeName": "source.via",
+  "repository": {
+    "headersnippets": {
+      "begin": "###+",
+      "end": "###+",
+      "name": "punctuation.definition.tag.begin.html",
+      "contentName": "headersnippet",
+      "patterns": [
+        {
+          "name": "entity.name.tag.html",
+          "match": "\\w+"
+        }
+      ]
+    },
+    "viasnippets": {
+      "begin": "(--via)",
+      "end": "(--)",
+      "captures": {
+        "1": {
+          "name": "punctuation.definition.tag.begin.html"
+        }
+      },
+      "name": "viasnippet",
+      "contentName": "viasnippet",
+      "patterns": [
+        {
+          "include": "#viacode"
+        }
+      ]
+    },
+    "ebnfsnippets": {
+      "begin": "(--ebnf)",
+      "end": "(--)",
+      "captures": {
+        "1": {
+          "name": "punctuation.definition.tag.begin.html"
+        }
+      },
+      "name": "ebnfsnippet",
+      "contentName": "ebnfsnippet",
+      "patterns": [
+        {
+          "include": "#ebnf"
+        }
+      ]
+    },
+    "regexsnippets": {
+      "begin": "(--regex)",
+      "end": "(--)",
+      "captures": {
+        "1": {
+          "name": "punctuation.definition.tag.begin.html"
+        }
+      },
+      "name": "regexsnippet",
+      "contentName": "regexsnippet",
+      "patterns": [
+        {
+          "include": "#regex"
+        }
+      ]
+    },
+    "plaintext": {
+      "patterns": [
+        {
+          "match": ".",
+          "name": "entity.name.tag.html"
+        }
+      ]
+    },
+    "ebnf": {
+      "patterns": [
+        {
+          "include": "#ebnf-comment"
+        },
+        {
+          "include": "#ebnf-definition"
+        },
+        {
+          "include": "#ebnf-skip"
+        },
+        {
+          "include": "#ebnf-string"
+        },
+        {
+          "include": "#ebnf-word"
+        }
+      ]
+    },
+    "ebnf-skip": {
+      "patterns": [
+        {
+          "name": "punctuation.definition.tag.begin.html",
+          "match": "\\bskip\\b"
+        }
+      ]
+    },
+    "ebnf-definition": {
+      "patterns": [
+        {
+          "name": "entity.name.type",
+          "match": "^\\b[a-z_]+\\b"
+        }
+      ]
+    },
+    "ebnf-word": {
+      "patterns": [
+        {
+          "name": "variable.ebnf",
+          "match": "\\b[a-z_]+\\b"
+        }
+      ]
+    },
+    "ebnf-comment": {
+      "patterns": [
+        {
+          "name": "comment.ebnf",
+          "match": "#.*"
+        }
+      ]
+    },
+    "ebnf-string": {
+      "name": "string.quoted.double.via",
+      "begin": "'",
+      "end": "'"
+    },
+    "viacode": {
+      "patterns": [
+        {
+          "include": "#comments"
+        },
+        {
+          "include": "#multilinecomments"
+        },
+        {
+          "include": "#keywords"
+        },
+        {
+          "include": "#functions"
+        },
+        {
+          "include": "#typecaseoverrides"
+        },
+        {
+          "include": "#cases"
+        },
+        {
+          "include": "#types"
+        },
+        {
+          "include": "#rawstrings"
+        },
+        {
+          "include": "#strings"
+        },
+        {
+          "include": "#variables"
+        }
+      ]
+    },
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.via",
+          "match": "#[^\n]*"
+        }
+      ]
+    },
+    "multilinecomments": {
+      "begin": "/\\*",
+      "end": "\\*/",
+      "name": "comment",
+      "contentName": "comment",
+      "patterns": [
+        {
+          "include": "#multilinecomments",
+          "name": "comment"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.via",
+          "match": "\\b(abstract|and|as|break|case|continue|construct|default|def|drop|else|enum|eq|extends|false|for|generic|heapalloc|if|impl|in|is|let|lifetime|match|mod|neq|not|or|override|pass|private|readonly|return|stackalloc|struct|true|type|using|var|while|yield)\\b"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "entity.name.function",
+          "match": "\\b_*[a-z][a-z0-9_]*\\("
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "entity.name.type",
+          "match": "\\_*[A-Z][a-zA-Z0-9_]*"
+        }
+      ]
+    },
+    "rawstrings": {
+      "name": "string.quoted.double.via",
+      "begin": "r\"",
+      "end": "\""
+    },
+    "strings": {
+      "name": "string.quoted.double.via",
+      "begin": "m?\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.via",
+          "match": "(\\\\.)|(\\{[^\\}]*\\})"
+        }
+      ]
+    },
+    "typecaseoverrides": {
+      "patterns": [
+        {
+          "name": "entity.name.type",
+          "match": "\\b[UIF](8|16|32|64|128|256)\\b"
+        }
+      ]
+    },
+    "cases": {
+      "patterns": [
+        {
+          "match": "\\b_*[A-Z][A-Z0-9_]+\\b",
+          "name": "variable.other.constant"
+        }
+      ]
+    },
+    "variables": {
+      "patterns": [
+        {
+          "name": "variable.via",
+          "match": "\\b_*[a-z][a-z0-9_]*\\b"
+        }
+      ]
+    },
+    "regex": {
+      "patterns": [
+        {
+          "include": "#regex-brackets"
+        },
+        {
+          "include": "#regex-keysymbols"
+        },
+        {
+          "include": "#regex-escapes"
+        },
+        {
+          "include": "#regex-text"
+        }
+      ]
+    },
+    "regex-brackets": {
+      "patterns": [
+        {
+          "name": "color-please",
+          "match": "[\\(\\)\\[\\]\\{\\}]"
+        }
+      ]
+    },
+    "regex-keysymbols": {
+      "patterns": [
+        {
+          "name": "constant.character.escape.via",
+          "match": "[\\+\\*\\?\\_]"
+        }
+      ]
+    },
+    "regex-escapes": {
+      "patterns": [
+        {
+          "name": "constant.character.escape.via",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "regex-text": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.via",
+          "match": "."
+        }
+      ]
+    }
+  }
+}

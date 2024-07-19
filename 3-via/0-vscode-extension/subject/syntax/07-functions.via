@@ -1,0 +1,136 @@
+#############
+# Functions #
+#############
+
+Functions take in parameters that can defined just using the type.
+Void functions have no return type.
+
+--via
+def use(Power) {
+	print(power.use())
+}
+
+use(THE_FORCE)
+--
+
+Function arguments can have names. Multiple sequential named arguments with the same
+type can be declared in one go, separated by commas.
+
+--via
+def dot(Vec2 a, b) -> F64 {
+	return a.x*b.x + a.y*b.y
+}
+--
+
+Functions that return something need to specify their return type.
+Also, input variable names can be specified, and defaults.
+
+--via
+def get_powers(Character char = HERO) -> List[Power] {
+	return char.powers;
+}
+--
+
+Note that while types are required for the program to be valid, for the sake of helpful error messages I think it makes sense to validate this later. 
+From a parser's point of view, leaving out the type is no trouble, this is still recognizable as a function, even if it won't compile.
+
+--via
+def get_powers(char) -> List[Power] {
+	return char.powers;
+}
+--
+
+Functions can also be declared using alternative keywords to def, relating to subtyping.
+These include "abstract", and "override".
+
+Functions don't have to have blocks - when this is legal is again a question that isn't for the parser,
+it's for a later stage.
+
+--via
+abstract get_powers(Character) -> List[Power]
+--
+
+#######################
+# Types as Namespaces #
+#######################
+
+Types could be made act as namespaces for functions.
+I haven't added this to the grammar yet.
+
+--via
+let ships = List(Ship)
+
+def Ship.get_ships() {
+	return ships
+}
+--
+
+################
+# Constructors #
+################
+
+Same as an ordinary function, except that it has the same name as a type.
+Also, it can't be abstract or virtual, but again, that's not for the parser to worry about.
+
+--via
+def Editor(Str) {
+	...
+}
+--
+
+####################
+# Lambda Functions #
+####################
+
+Lambdas are different from functions in that they don't have names, don't have to consider types, and can be one-liners.
+They are also expressions instead of statements.
+
+--via
+[(1, 2), ...].map(def(x, y) {
+	return x*y - y
+})
+--
+
+Expression-body version:
+
+--via
+[(1, 2), ...].map(def(x, y): x*y - y)
+--
+
+An alternative expression-body version could look like:
+
+--via
+[(1, 2), ...].map(def(x, y) return x*y - y)
+--
+
+###########
+# Grammar #
+###########
+
+
+The grammar for all this is:
+
+--ebnf
+statement = (
+	...
+	| function_definition
+	| function_call
+    | lambda_function
+    | return_statement
+	...
+);
+
+function_definition = fn_declarator, fn_name, fn_params, [fn_return], block
+function_call = expression, '(', [expression, {',', expression}], ')'
+lambda_function = 'def', fn_params, ['->', qualified_type], (block | expression_block)
+return_statement = 'return', [expression]
+
+fn_name = snake_name
+fn_params = '(', [function_param, {',', function_param}], ')'
+fn_declarator = 'def' | 'impl' | 'abstract' | 'override'
+fn_return = '->', qualified_type 
+expression_block = ':', expression
+
+function_param = qualified_type, [named_fn_param, {',', named_fn_param}]
+named_fn_param = name, ['=', expression]
+--

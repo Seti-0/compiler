@@ -1,0 +1,109 @@
+
+###################################################
+# Buffers, and Establishing Fundamental Lifetimes #
+###################################################
+
+I have a fairly clear idea of how to propagate lifetimes from existing ones.
+Like, a function that uses other functions and types with well defined lifetimes
+results in the following lifetime etc.
+
+But it can't be turtles all the way down. Where does it start?
+
+I was thinking of a fundamental, compiler-implemented, type Buffer.
+A buffer has a size, and corresponds to some allocated portion of memory.
+It's lifetime is the lifetime of the memory, RAII style.
+
+--via
+type List[Item] {
+    private {
+        Buffer[Item]
+        USize size
+    }
+}
+
+def get(List, USize index) -> Item {
+    return buffer.
+}
+--
+
+You could also have a StaticBuffer, with a fixed size.
+
+--via
+type Array[Item] {
+    private {
+        StaticBuffer[Item, 4]
+    }
+}
+--
+
+#########################
+# Lifetime Invalidation #
+#########################
+
+Taking a look at the list example again:
+
+--via
+type List[Item] {
+    private {
+        Buffer[Item]
+        USize size
+    }
+}
+
+def add(Item) {
+    if size == buffer.count() {
+        buffer.resize(buffer.count()*2, move_existing=True)
+    }
+
+    buffer.emplace(size, item)
+    size++;
+}
+--
+
+The lifetime of references to the memory buffer do *not* have the same lifetime
+of the list. Each time the buffer is resized, references to that memory is invalidated.
+The objects are moved.
+
+--via
+lifetime t'
+
+type List[t', Item] {
+    private {
+        Buffer[t', Item]
+        USize size
+    }
+}
+
+// By 'var' here, I mean that the lifetime can change here.
+// i.e. the buffer can be resized, invaliding all previous references.
+def add(List[var t', Item], Item) {
+    ...
+}
+
+def reserve(List[var t', Item], USize size) {
+    ...
+}
+
+def get(USize index) -> ref t' Item {
+    return buffer.get(index)
+}
+--
+
+In the below code, well. None of this is relevant because
+integers are trivially copy-friendly.
+But if the integers were replaced with mutable objects, the break in lifetime
+of the return from x forcibly promotes the contents of x to be shared references.
+If x.add(4) were removed, the shared reference wouldn't be needed.
+
+--via
+let x = [1, 2, 3]
+let y = x[0]
+x.add(4)
+print(y)
+--
+
+Given that the buffer is dropped when the list is dropped,
+the list's drop also takes a "var t'".
+Not that this makes a difference, because the maximum lifetime
+of t' is the lifetime of the list, I think.
+Unless buffers can be taken.

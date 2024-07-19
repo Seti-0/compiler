@@ -1,0 +1,128 @@
+####################
+# Matching by Type #
+####################
+
+I'd like matching based on type to be as efficient as possible,
+and to be a standard, recommended, way of coding in this language.
+
+i.e. no rtti/typeinfo worries like in C++/C#.
+
+#################
+# Trivial Cases #
+#################
+
+First things first. 
+There are cases where it is trivially known to the compiler whether a variable
+matches a type or not. In the example below, for example, the variable 'x'
+has static type F32, which can never be I32.
+
+--via
+let x = 3.4
+
+match type x
+case I32 {
+    print("This is an i32!")
+}
+--
+
+This might seem trivial, but it's actually quite important to note.
+It means that no *general* runtime method for identifying a values type is needed here,
+which is good because any such method would incur significant overhead. (like keeping
+a meta pointer with every integer would be ridiculous!)
+
+Instead, the compiler can statically evaluate the check and flatten the match statement
+into just a set of plain statements that came from the correct case block.
+
+#################################
+# Trivial Cases and 'is' checks #
+#################################
+
+Quick side note.
+In the case below is just as simple, though the compiler might
+take a few extra steps compared to match.
+
+--via
+if x is I32 {
+    print("This is an i32!")
+}
+--
+
+Here, the 'is' check is statically evaluated to 'true'.
+I guess the compiler could later remove any constant conditional statements
+and just fill in the correct branch, but that is a separate concern.
+
+Either way, we don't need runtime information here!
+
+###############################
+# Detecting Non-Trivial Cases #
+###############################
+
+The question then is when runtime information is needed.
+There are three main cases.
+
+    Enumerations.
+
+    Inheritence heirarchies.
+
+    Trait hierarchies.
+
+My original intent was to implement enumerations has tagged unions,
+so, having a bit or byte at the beginning of their data to describe 
+which case the instance represents. This seems fine.
+However, they can also be modelled as types implementing traits, as
+far as type-comparison is concerned, so the two could maybe be unified there?
+
+Inheritence heirarchies are potentially relatively simple, since they already
+carry metadata for virtual function lookups. So it doesn't break the performance
+bank to add in a pointer for metadata that can be used to check class relations.
+
+Trait hierarchies are by far the most mysterious of the three
+to me right now. Everything can be tagged with a trait,
+and that should not incur global overhead.
+
+##################################
+# Implementing Trait Hierarchies #
+##################################
+
+Given a type. (Assuming we have that somehow, either statically or using rtti)
+Can we determine if it inherits from a trait?
+Bear in mind, the trait implementation could be defined late with respect to the type info.
+So we can't just attach a list of traits to the type info.
+
+We also can't just attach a list of implementing types to the trait's type info, since
+the implementation could be defined late with respect to that to. (The 3-compilation-unit problem)
+
+The worst case would be to include a static lookup - with both type and trait as keys - that can
+be queried at runtime to know if the trait is directly implemented. This lookup would either have
+to have entries for all supertypes, or the query would have to repeated for all subtypes of the 
+type being checked against. I'm worried about the scalability of this, though.
+It seems like the more traits and types are included, the slower this would get.
+
+One way to control that might be to make it a hierarchal map, exploiting the hierarchal nature
+of traits. That is, the lookup complexity would hopefully scale with the count of a subset 
+of closely related traits. I'm not sure which subset yet - ancestors, descendents? Something like that.
+
+######################
+# Aside: Old Example #
+######################
+
+I'd like the following code to be efficient, and be no
+worse than manually adding tags or such.
+
+--via
+let values = List(Number, [Int(4), Float(2.3), Int(23)])
+
+for val in values {
+    match type val
+    case Int {
+        ...
+    }
+    case Float {
+        ...
+    }
+}
+--
+
+Obviously the types usually wouldn't be basic numeric types,
+but this exact case came up when I was making a rough debug view
+recently, and wanted to format decimals and integers differently.

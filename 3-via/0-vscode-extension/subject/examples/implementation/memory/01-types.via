@@ -1,0 +1,258 @@
+#######################################
+# Memory-Related Types, and Lifetimes #
+#######################################
+
+Taking a look at the following example:
+
+--via
+def function() {
+    characters = List(Character)
+    characters.add(Character("Jez"))
+    characters.add(Character("Adam"))
+    characters.add(Character("Sam"))
+
+    encounters = List(Character)
+
+    for i in range(10) {
+        index = random.next_int(characters.len())
+        encounters.add(characters.get(index))
+    }
+
+    return encounters
+}
+--
+
+With the types approach I'm looking at here, step one 
+is to infer non-memory related types as normal.
+So:
+
+--via
+def function() {
+    characters = List(Character)
+    add(List[Character]:characters, Character("Jez"))
+    ...
+
+    encounters = List(Character)
+
+    for i in range(10) {
+        ...
+        add(List[Character]:encounters, get(List[Character]:characters, USize:index))
+    }
+
+    return encounters
+}
+--
+
+Step two is to add a standard array of memory-related context-indie guesses.
+Make all variables value-based not referenced-based, for example.
+
+--via
+def function() {
+    characters'local = List(val'local:Character)
+    add(ref'local:List[val'local:Character] characters, val'temp Character("Jez"))
+    ...
+
+    encounters'output = List(val'output:Character)
+
+    for i in range(10) {
+        ...
+        add(encounters -> ref'output:List[val'output:Character], ref'local:Character get(ref'local:List[Character] characters, index) -> val'output:Character)
+    }
+
+    return encounters
+}
+--
+
+This leads to a series of conflicts that arise, which can be resolved in the order
+they appear in. They are resolved by promoting or demoting types - moving from 
+value to shared, or value to reference, for example.
+
+The only conflict in the example above is this line:
+
+--via
+add(encounters -> ref'output:List[val'output:Character], ref'local:Character get(ref'local:List[Character] characters, index) -> val'output:Character)
+--
+
+That's very verbose! We can ignore the first parameter, that's not the conflict.
+The second parameter looks like:
+
+--via
+ref'local:Character get(ref'local:List[Character] characters, index) -> val'output:Character
+--
+
+ie.
+
+--via
+ref'local:Character -> val'output:Character
+--
+
+The options for promotion are:
+
+    > demote target to reference - if the target lifetime is less or equal to the source lifetime.
+    > demote source to reference - if the code is executed exactly once. [ERROR: there is more to than this]
+    > destructive move from source to target - if the source is never referenced again.
+    > make source and target to shared owners.
+
+The first three conditions aren't met:
+
+    > the target is returned and the source local, so the target lifetime is greater.
+    > the source code is within a loop, it could be executed many times.
+    > again, by virtue of the loop, the source could be referenced again.
+
+So... shared owners it is.
+With this conflict resolved, no further conflicts arise:
+
+--via
+def function() {
+    characters'local = List(shared:Character)
+    add(ref'local:List[shared:Character] characters, val'temp Character("Jez"))
+    ...
+
+    encounters'output = List(shared'output:Character)
+
+    for i in range(10) {
+        ...
+        add(encounters -> ref'output:List[shared:Character], ref'local:(shared:Character) get(shared:List[Character] characters, index) -> shared:Character)
+    }
+
+    return encounters
+}
+--
+
+#######################
+# Aside: ABI Concerns #
+#######################
+
+Two things.
+
+Firstly, the precise ABI of a library depends on the quality of the static memory analysis - extra rules might
+allow some more functions to take or return non-shared values, for example.
+
+Secondly, with stable rules, small changes in source code could make big changes to the ABI, without changing
+any method signatures. In C terms, the implementation affects the declaration. 
+
+Both of these mean that ABI stability is gone - things have to be compiled with the same compiler and source
+for them to work together. It might be possible to migitate this - settings to use as many shared pointers
+at program boundaries as is reasonable to bullet-proof it, for example. But it wouldn't be perfect.
+
+I'm not too worried about all this though. What matters to me is iteration speed, so iterative builds.
+It doesn't bother me if there is an initial delay to build all dependencies, as long as they don't
+have to be built more than once.
+
+This reminds me a lot of Julia!
+
+######################################
+# Demoting Value Types to References #
+######################################
+
+A simple little example.
+
+--via
+let a = Item()
+let b = Item()
+let x = [a, b]
+--
+
+A first pass on memory-aware types could be:
+
+--via
+let a :: val'local:Item = Item()
+let b :: val'local:Item = Item()
+let x :: val'local:List[val'local:Item]
+add(a -> val'local:Item)
+add(b -> val'local:Item)
+--
+
+Assuming Item isn't trivially copyable, the initial go above hits
+an inconsistency here:
+
+--via
+let a :: val'local:Item
+add(a -> val'local:Item) 
+--
+
+This requires a copy from val to val.
+The nuclear option here is to promote the value to shared'local:Item.
+However, a neater option if it could be recognized here would be to
+demote the generic parameter on x from val'local:Item to ref'local:Item.
+
+Then we get:
+
+--via
+let a :: val'local:Item = Item()
+let b :: val'local:Item = Item()
+let x :: val'local:List[ref'local:Item]
+add(a -> ref'local:Item)
+add(b -> ref'local:Item)
+--
+
+Which is perfectly legal.
+I'm not sure what conditions would allow for this inference.
+
+Second version:
+
+--via
+let a = Item()
+let x = List(Item)
+for i in range(10) {
+    x.add(a)
+}
+--
+
+Becomes:
+
+--via
+let a :: val'local:Item = Item()
+let x :: val'local:List[val'local:Item] = List(Item)
+for i in range(10) {
+    add(x -> ref'temp:List[val'local:Item], a -> val'local:Item)
+}
+--
+
+Again, here, we could go with 'a :: shared'local:Item'.
+Or, neater, we could go with 'x :: val'local:List[ref'local:Item]'.
+I think the condition is purely lifetime-based.
+If the lifetime of the val-type assigned to is less than or equal to the lifetime
+of the val-type being assigned from, then the assignment target can be demoted.
+
+Since the assignment target shares it's type with other statements, all lifetimes
+would have to satisfy that property for the demotion to take place. If any one 
+fails, then a promotion to shared has to happen instead.
+
+One last simple little example:
+
+--via
+let a :: val'local:Item = Item()
+let b :: val'local:Item = val'local:Item a
+--
+
+Again, the second line has a val -> val assignment.
+Since the lifetime of the target is equal or less than the lifetime of the source,
+a demotion can occur and we get:
+
+--via
+let a :: val'local:Item = Item()
+let b :: ref'local:Item = val'local:Item a
+--
+
+If instead we had:
+
+--via
+let a :: val'local:Item = Item()
+let b :: val'out:Item = val'local:Item a
+return b
+--
+
+Now out' > local', so now a is the only one that can be demoted.
+
+--via
+let a :: ref'local:Item = &b Item()
+let b :: val'out:Item = val'local:Item b
+return b
+--
+
+Which is fine.
+
+--via
+add(...:encounters, val'b Character:get(shared'a:List[Character]:characters, index) -> val'a:Character)
+--

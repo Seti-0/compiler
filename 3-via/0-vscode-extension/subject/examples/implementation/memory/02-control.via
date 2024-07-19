@@ -1,0 +1,60 @@
+##################################
+# Control: Who Allocates Memory? #
+##################################
+
+I've kinda assumed a top-down approach for now.
+This works really well for the stack, because lower-level
+stack frames are lost when returns occur.
+
+--via
+def make_instance() -> Item {
+    return Item()
+}
+
+// Allocate in the stackframe of the caller.
+// i.e. the caller controls memory allocation.
+let x = make_instance()
+--
+
+However, this is no longer true where the heap is concerned.
+For example.
+
+--via
+let instances = List(Item)
+def make_instance() -> Item {
+    instances.add(Item())
+    return instances.last()
+}
+
+// Don't allocate! Just reference.
+let x = make_instance()
+--
+
+I guess it's a lifetime thing again.
+Ah... Rust. I see you.
+
+--via
+let instances :: (val static List[val static Item]) = List(Item)
+def make_instance() -> (ref static Item) {
+    instances.add(Item())
+    return instances.last()
+}
+
+let x :: (ref static List) = make_instance()
+--
+
+Annotating the one from before:
+
+--via
+def make_instance() -> (val temp Item) {
+    return Item()
+}
+
+// Allocate in the stackframe of the caller.
+// i.e. the caller controls memory allocation.
+let x = make_instance()
+--
+
+The return by value with temp lifetime is what causes the caller
+to allocate memory for the function. Otherwise, the function maybe
+do it via the heap.

@@ -1,0 +1,39 @@
+--via
+
+TVec2[T <: Number]  // generic number
+UVec2               // unsigned ints
+IVec2               // signed ints
+FVec2               // 32-bit floats
+Vec2                // 64-bit floats
+
+def Vec2 as TVec2
+struct Vec2 {
+    F64 x, y
+}
+
+def dot(TVec2[T] a, b) -> T {
+    return a.x*b.x + a.y*b.y
+}
+
+using location.Location
+using parts {
+    Engine, Crew
+}
+
+struct Ship {
+    Engine
+    Crew
+    List[Location] destinations
+}
+
+def warp(Ship, Location) {
+    engine.begin_warp()
+    destinations.add(location)
+}
+
+//////////////////
+// Hello World! //
+//////////////////
+
+Ship().warp(Location("Milky Way"))
+--
